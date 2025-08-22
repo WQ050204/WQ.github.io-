@@ -3,7 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>振动系统综合模拟器</title>
+    <meta name="description" content="振动系统综合模拟器 - 交互式物理教学工具，包含阻尼振动和受迫振动模拟，实时动画演示和数据分析">
+    <meta name="keywords" content="物理模拟器,阻尼振动,受迫振动,共振,物理教学,oscillation,damped oscillation,forced oscillation">
+    <meta name="author" content="Physics Simulator">
+    
+    <!-- Open Graph Tags for Social Media -->
+    <meta property="og:title" content="振动系统综合模拟器">
+    <meta property="og:description" content="交互式物理教学工具 - 阻尼振动与受迫振动实时模拟">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎯</text></svg>">
+    
+    <title>振动系统综合模拟器 | Oscillation System Simulator</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎯</text></svg>">
+    
     <style>
         * {
             margin: 0;
@@ -131,6 +145,15 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 50%;
             cursor: pointer;
+        }
+
+        .parameter-input input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
         }
 
         .parameter-input input[type="number"] {
@@ -343,6 +366,24 @@
             display: block;
         }
 
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .footer a:hover {
+            border-bottom-color: white;
+        }
+
         @media (min-width: 768px) {
             .container {
                 max-width: 768px;
@@ -372,13 +413,36 @@
             margin: 10px 0;
             display: none;
         }
+
+        /* Loading Animation */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ddd;
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🎯 振动系统综合模拟器</h1>
-            <p>交互式物理教学工具</p>
+            <p>交互式物理教学工具 | Interactive Physics Teaching Tool</p>
         </div>
 
         <!-- 模拟器选择器 -->
@@ -642,9 +706,22 @@
                 </div>
             </div>
         </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>© 2024 振动系统综合模拟器 | Created with ❤️ for Physics Education</p>
+            <p>
+                <a href="https://github.com" target="_blank">View on GitHub</a> | 
+                <a href="mailto:contact@example.com">Contact</a>
+            </p>
+        </div>
     </div>
 
     <script>
+        // ============================================
+        // 振动系统综合模拟器 - 完整JavaScript代码
+        // ============================================
+        
         // 当前活动的模拟器
         let currentSimulator = 'damped';
 
@@ -1929,6 +2006,8 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('振动系统综合模拟器加载中...');
+            
             dampedSim.init();
             forcedSim.init();
             
@@ -1940,6 +2019,8 @@
                     forcedSim.handleResize();
                 }
             });
+            
+            console.log('振动系统综合模拟器初始化完成！');
         });
     </script>
 </body>
