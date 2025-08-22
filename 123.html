@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>振动系统综合模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 100%;
+            padding: 10px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            padding: 15px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .simulator-selector {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 10px;
+            margin: 15px auto;
+            max-width: 500px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .selector-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .selector-btn.active {
+            background: white;
+            color: #764ba2;
+            border-color: white;
+            transform: scale(1.05);
+        }
+
+        .selector-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .simulator-container {
+            display: none;
+        }
+
+        .simulator-container.active {
+            display: block;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .parameters-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .parameter-group {
+            margin-bottom: 15px;
+        }
+
+        .parameter-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .parameter-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .parameter-input input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .parameter-input input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .parameter-input input[type="number"] {
+            width: 70px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .control-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+            color: white;
+        }
+
+        .pause-btn {
+            background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
+            color: white;
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #ee5a24 0%, #f79f1f 100%);
+            color: white;
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+        }
+
+        .control-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .info-section {
+            background: #e8f4f8;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .info-value {
+            color: #666;
+        }
+
+        .animation-container {
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .animation-canvas {
+            width: 100%;
+            height: 250px;
+            display: block;
+        }
+
+        .charts-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 15px;
+        }
+
+        .charts-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .charts-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .show-charts-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .show-charts-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .charts-content {
+            display: none;
+        }
+
+        .charts-content.active {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-button {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .charts-canvas-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .chart-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: white;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .chart-canvas.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .chart-canvas {
+            width: 100%;
+            height: 300px;
+            display: block;
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .speed-control {
+            margin-top: 10px;
+        }
+
+        .section-divider {
+            border-top: 2px solid #e0e0e0;
+            margin: 15px 0;
+            padding-top: 15px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                max-width: 768px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 32px;
+            }
+
+            .animation-canvas {
+                height: 350px;
+            }
+
+            .charts-canvas-container {
+                height: 400px;
+            }
+        }
+
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            padding: 10px;
+            background: #ffe0e0;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 振动系统综合模拟器</h1>
+            <p>交互式物理教学工具</p>
+        </div>
+
+        <!-- 模拟器选择器 -->
+        <div class="simulator-selector">
+            <button class="selector-btn active" onclick="switchSimulator('damped')">阻尼振动</button>
+            <button class="selector-btn" onclick="switchSimulator('forced')">受迫振动</button>
+        </div>
+
+        <!-- 阻尼振动模拟器 -->
+        <div id="dampedSimulator" class="simulator-container active">
+            <div class="main-content">
+                <!-- 参数设置 -->
+                <div class="parameters-section">
+                    <div class="parameter-group">
+                        <label>质量 Mass (kg)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-massSlider" min="0.1" max="5" step="0.1" value="1">
+                            <input type="number" id="damped-massInput" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>弹簧常数 Spring Constant (N/m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-springSlider" min="1" max="50" step="0.5" value="10">
+                            <input type="number" id="damped-springInput" min="1" max="50" step="0.5" value="10">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>阻尼系数 Damping Coefficient (Ns/m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-dampingSlider" min="0" max="10" step="0.1" value="0.5">
+                            <input type="number" id="damped-dampingInput" min="0" max="10" step="0.1" value="0.5">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始位置 Initial Position (m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-positionSlider" min="-3" max="3" step="0.1" value="2">
+                            <input type="number" id="damped-positionInput" min="-3" max="3" step="0.1" value="2">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始速度 Initial Velocity (m/s)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-velocitySlider" min="-5" max="5" step="0.1" value="0">
+                            <input type="number" id="damped-velocityInput" min="-5" max="5" step="0.1" value="0">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group speed-control">
+                        <label>动画速度 Animation Speed</label>
+                        <div class="parameter-input">
+                            <input type="range" id="damped-speedSlider" min="0.1" max="3" step="0.1" value="1">
+                            <span id="damped-speedDisplay">1.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制按钮 -->
+                <div class="control-buttons">
+                    <button class="control-button start-btn" id="damped-startBtn">▶ 开始</button>
+                    <button class="control-button pause-btn" id="damped-pauseBtn">⏸ 暂停</button>
+                    <button class="control-button reset-btn" id="damped-resetBtn">↺ 重置</button>
+                </div>
+
+                <!-- 系统信息 -->
+                <div class="info-section">
+                    <div class="info-item">
+                        <span class="info-label">阻尼类型:</span>
+                        <span class="info-value" id="damped-dampingType">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">振动频率:</span>
+                        <span class="info-value" id="damped-frequency">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">振动周期:</span>
+                        <span class="info-value" id="damped-period">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">当前时间:</span>
+                        <span class="info-value" id="damped-currentTime">0.00 s</span>
+                    </div>
+                </div>
+
+                <!-- 主动画 -->
+                <div class="animation-container">
+                    <canvas id="damped-animationCanvas" class="animation-canvas"></canvas>
+                </div>
+
+                <!-- 图表 -->
+                <div class="charts-section">
+                    <div class="charts-header">
+                        <span class="charts-title">📊 详细图表分析</span>
+                        <button class="show-charts-btn" id="damped-toggleChartsBtn">显示图表</button>
+                    </div>
+                    
+                    <div class="charts-content" id="damped-chartsContent">
+                        <div class="tabs">
+                            <button class="tab-button active" data-tab="displacement">位移</button>
+                            <button class="tab-button" data-tab="velocity">速度</button>
+                            <button class="tab-button" data-tab="energy">能量</button>
+                        </div>
+
+                        <div class="charts-canvas-container">
+                            <canvas id="damped-displacementCanvas" class="chart-canvas active"></canvas>
+                            <canvas id="damped-velocityCanvas" class="chart-canvas"></canvas>
+                            <canvas id="damped-energyCanvas" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 受迫振动模拟器 -->
+        <div id="forcedSimulator" class="simulator-container">
+            <div class="main-content">
+                <!-- 参数设置 -->
+                <div class="parameters-section">
+                    <span class="section-title">系统参数</span>
+                    
+                    <div class="parameter-group">
+                        <label>质量 Mass (kg)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-massSlider" min="0.1" max="5" step="0.1" value="1">
+                            <input type="number" id="forced-massInput" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>弹簧常数 Spring Constant (N/m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-springSlider" min="1" max="50" step="0.5" value="10">
+                            <input type="number" id="forced-springInput" min="1" max="50" step="0.5" value="10">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>阻尼系数 Damping Coefficient (Ns/m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-dampingSlider" min="0" max="5" step="0.1" value="0.5">
+                            <input type="number" id="forced-dampingInput" min="0" max="5" step="0.1" value="0.5">
+                        </div>
+                    </div>
+
+                    <div class="section-divider">
+                        <span class="section-title">外力参数</span>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>外力幅值 Force Amplitude (N)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-forceSlider" min="0" max="10" step="0.1" value="2">
+                            <input type="number" id="forced-forceInput" min="0" max="10" step="0.1" value="2">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>外力频率 Force Frequency (rad/s)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-frequencySlider" min="0.1" max="10" step="0.1" value="3">
+                            <input type="number" id="forced-frequencyInput" min="0.1" max="10" step="0.1" value="3">
+                        </div>
+                    </div>
+
+                    <div class="section-divider">
+                        <span class="section-title">初始条件</span>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始位置 Initial Position (m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-positionSlider" min="-3" max="3" step="0.1" value="0">
+                            <input type="number" id="forced-positionInput" min="-3" max="3" step="0.1" value="0">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始速度 Initial Velocity (m/s)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-velocitySlider" min="-5" max="5" step="0.1" value="0">
+                            <input type="number" id="forced-velocityInput" min="-5" max="5" step="0.1" value="0">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group speed-control">
+                        <label>动画速度 Animation Speed</label>
+                        <div class="parameter-input">
+                            <input type="range" id="forced-speedSlider" min="0.1" max="3" step="0.1" value="1">
+                            <span id="forced-speedDisplay">1.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制按钮 -->
+                <div class="control-buttons">
+                    <button class="control-button start-btn" id="forced-startBtn">▶ 开始</button>
+                    <button class="control-button pause-btn" id="forced-pauseBtn">⏸ 暂停</button>
+                    <button class="control-button reset-btn" id="forced-resetBtn">↺ 重置</button>
+                </div>
+
+                <!-- 系统信息 -->
+                <div class="info-section">
+                    <div class="info-item">
+                        <span class="info-label">固有频率:</span>
+                        <span class="info-value" id="forced-naturalFrequency">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">频率比:</span>
+                        <span class="info-value" id="forced-frequencyRatio">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">稳态振幅:</span>
+                        <span class="info-value" id="forced-steadyAmplitude">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">相位差:</span>
+                        <span class="info-value" id="forced-phaseDifference">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">当前时间:</span>
+                        <span class="info-value" id="forced-currentTime">0.00 s</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">外力:</span>
+                        <span class="info-value" id="forced-currentForce">0.00 N</span>
+                    </div>
+                </div>
+
+                <!-- 主动画 -->
+                <div class="animation-container">
+                    <canvas id="forced-animationCanvas" class="animation-canvas"></canvas>
+                </div>
+
+                <!-- 图表 -->
+                <div class="charts-section">
+                    <div class="charts-header">
+                        <span class="charts-title">📊 详细图表分析</span>
+                        <button class="show-charts-btn" id="forced-toggleChartsBtn">显示图表</button>
+                    </div>
+                    
+                    <div class="charts-content" id="forced-chartsContent">
+                        <div class="tabs">
+                            <button class="tab-button active" data-tab="displacement">位移</button>
+                            <button class="tab-button" data-tab="velocity">速度</button>
+                            <button class="tab-button" data-tab="energy">能量</button>
+                            <button class="tab-button" data-tab="resonance">共振曲线</button>
+                        </div>
+
+                        <div class="charts-canvas-container">
+                            <canvas id="forced-displacementCanvas" class="chart-canvas active"></canvas>
+                            <canvas id="forced-velocityCanvas" class="chart-canvas"></canvas>
+                            <canvas id="forced-energyCanvas" class="chart-canvas"></canvas>
+                            <canvas id="forced-resonanceCanvas" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 当前活动的模拟器
+        let currentSimulator = 'damped';
+
+        // 切换模拟器
+        function switchSimulator(type) {
+            // 停止当前模拟器
+            if (currentSimulator === 'damped') {
+                dampedSim.pauseAnimation();
+            } else {
+                forcedSim.pauseAnimation();
+            }
+
+            // 切换显示
+            document.querySelectorAll('.simulator-container').forEach(container => {
+                container.classList.remove('active');
+            });
+            document.querySelectorAll('.selector-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            if (type === 'damped') {
+                document.getElementById('dampedSimulator').classList.add('active');
+                document.querySelector('[onclick="switchSimulator(\'damped\')"]').classList.add('active');
+                currentSimulator = 'damped';
+                // 重新设置canvas尺寸
+                setTimeout(() => dampedSim.handleResize(), 100);
+            } else {
+                document.getElementById('forcedSimulator').classList.add('active');
+                document.querySelector('[onclick="switchSimulator(\'forced\')"]').classList.add('active');
+                currentSimulator = 'forced';
+                // 重新设置canvas尺寸
+                setTimeout(() => forcedSim.handleResize(), 100);
+            }
+        }
+
+        // ============= 阻尼振动模拟器 =============
+        const dampedSim = {
+            // 状态
+            state: {
+                isPlaying: false,
+                currentIndex: 0,
+                animationId: null,
+                animationSpeed: 1.0,
+                chartsVisible: false,
+                initialized: false
+            },
+
+            // 物理参数
+            params: {
+                mass: 1,
+                springConstant: 10,
+                dampingCoefficient: 0.5,
+                initialPosition: 2,
+                initialVelocity: 0
+            },
+
+            // 数据数组
+            data: {
+                time: [],
+                position: [],
+                velocity: [],
+                kineticEnergy: [],
+                potentialEnergy: [],
+                totalEnergy: []
+            },
+
+            // Canvas引用
+            canvases: {},
+            contexts: {},
+
+            // 初始化
+            init() {
+                this.initializeCanvases();
+                this.setupEventListeners();
+                this.calculatePhysics();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                this.state.initialized = true;
+            },
+
+            // 初始化Canvas
+            initializeCanvases() {
+                const animCanvas = document.getElementById('damped-animationCanvas');
+                if (animCanvas) {
+                    this.canvases.animation = animCanvas;
+                    this.contexts.animation = animCanvas.getContext('2d');
+                    this.setCanvasSize(animCanvas);
+                }
+
+                ['displacement', 'velocity', 'energy'].forEach(id => {
+                    const canvas = document.getElementById('damped-' + id + 'Canvas');
+                    if (canvas) {
+                        this.canvases[id] = canvas;
+                        this.contexts[id] = canvas.getContext('2d');
+                        this.setCanvasSize(canvas);
+                    }
+                });
+            },
+
+            // 设置Canvas尺寸
+            setCanvasSize(canvas) {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            },
+
+            // 处理窗口调整
+            handleResize() {
+                Object.values(this.canvases).forEach(canvas => {
+                    if (canvas) this.setCanvasSize(canvas);
+                });
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            // 设置事件监听器
+            setupEventListeners() {
+                const self = this;
+                
+                document.getElementById('damped-startBtn').addEventListener('click', () => self.startAnimation());
+                document.getElementById('damped-pauseBtn').addEventListener('click', () => self.pauseAnimation());
+                document.getElementById('damped-resetBtn').addEventListener('click', () => self.resetAnimation());
+                document.getElementById('damped-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+
+                // 标签页
+                document.querySelectorAll('#damped-chartsContent .tab-button').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        self.switchTab(this.dataset.tab);
+                    });
+                });
+
+                // 参数监听器
+                this.setupParameterListeners();
+
+                // 速度控制
+                const speedSlider = document.getElementById('damped-speedSlider');
+                speedSlider.addEventListener('input', function() {
+                    self.state.animationSpeed = parseFloat(this.value);
+                    document.getElementById('damped-speedDisplay').textContent = self.state.animationSpeed.toFixed(1) + 'x';
+                });
+            },
+
+            // 设置参数监听器
+            setupParameterListeners() {
+                const self = this;
+                const parameters = [
+                    { slider: 'damped-massSlider', input: 'damped-massInput', param: 'mass' },
+                    { slider: 'damped-springSlider', input: 'damped-springInput', param: 'springConstant' },
+                    { slider: 'damped-dampingSlider', input: 'damped-dampingInput', param: 'dampingCoefficient' },
+                    { slider: 'damped-positionSlider', input: 'damped-positionInput', param: 'initialPosition' },
+                    { slider: 'damped-velocitySlider', input: 'damped-velocityInput', param: 'initialVelocity' }
+                ];
+
+                parameters.forEach(({ slider, input, param }) => {
+                    const sliderEl = document.getElementById(slider);
+                    const inputEl = document.getElementById(input);
+
+                    sliderEl.addEventListener('input', function() {
+                        inputEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+
+                    inputEl.addEventListener('change', function() {
+                        sliderEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+                });
+            },
+
+            // 计算物理数据
+            calculatePhysics() {
+                Object.keys(this.data).forEach(key => {
+                    this.data[key] = [];
+                });
+
+                const { mass, springConstant, dampingCoefficient, initialPosition, initialVelocity } = this.params;
+                const omega_n = Math.sqrt(springConstant / mass);
+                const zeta = dampingCoefficient / (2 * Math.sqrt(mass * springConstant));
+                const dt = 0.05;
+                const t_max = 20;
+
+                for (let t = 0; t <= t_max; t += dt) {
+                    this.data.time.push(t);
+
+                    let position, velocity;
+
+                    if (zeta < 1) {
+                        const omega_d = omega_n * Math.sqrt(1 - zeta * zeta);
+                        const A = Math.sqrt(
+                            initialPosition * initialPosition + 
+                            Math.pow((initialVelocity + zeta * omega_n * initialPosition) / omega_d, 2)
+                        );
+                        const phi = Math.atan2(
+                            initialVelocity + zeta * omega_n * initialPosition,
+                            initialPosition * omega_d
+                        );
+
+                        position = A * Math.exp(-zeta * omega_n * t) * Math.cos(omega_d * t - phi);
+                        velocity = -A * Math.exp(-zeta * omega_n * t) * 
+                                  (zeta * omega_n * Math.cos(omega_d * t - phi) + 
+                                   omega_d * Math.sin(omega_d * t - phi));
+                    } else if (Math.abs(zeta - 1) < 0.01) {
+                        const C1 = initialPosition;
+                        const C2 = initialVelocity + omega_n * initialPosition;
+                        position = (C1 + C2 * t) * Math.exp(-omega_n * t);
+                        velocity = (C2 - omega_n * (C1 + C2 * t)) * Math.exp(-omega_n * t);
+                    } else {
+                        const sqrt_term = Math.sqrt(zeta * zeta - 1);
+                        const r1 = -omega_n * (zeta - sqrt_term);
+                        const r2 = -omega_n * (zeta + sqrt_term);
+                        const C1 = (initialVelocity - r2 * initialPosition) / (r1 - r2);
+                        const C2 = (r1 * initialPosition - initialVelocity) / (r1 - r2);
+                        position = C1 * Math.exp(r1 * t) + C2 * Math.exp(r2 * t);
+                        velocity = C1 * r1 * Math.exp(r1 * t) + C2 * r2 * Math.exp(r2 * t);
+                    }
+
+                    this.data.position.push(position);
+                    this.data.velocity.push(velocity);
+
+                    const ke = 0.5 * mass * velocity * velocity;
+                    const pe = 0.5 * springConstant * position * position;
+                    this.data.kineticEnergy.push(ke);
+                    this.data.potentialEnergy.push(pe);
+                    this.data.totalEnergy.push(ke + pe);
+                }
+            },
+
+            // 更新系统信息
+            updateSystemInfo() {
+                const { mass, springConstant, dampingCoefficient } = this.params;
+                const omega_n = Math.sqrt(springConstant / mass);
+                const zeta = dampingCoefficient / (2 * Math.sqrt(mass * springConstant));
+
+                let dampingType, frequency, period;
+                
+                if (zeta < 1) {
+                    dampingType = '欠阻尼';
+                    const omega_d = omega_n * Math.sqrt(1 - zeta * zeta);
+                    frequency = (omega_d / (2 * Math.PI)).toFixed(3) + ' Hz';
+                    period = (2 * Math.PI / omega_d).toFixed(3) + ' s';
+                } else if (Math.abs(zeta - 1) < 0.01) {
+                    dampingType = '临界阻尼';
+                    frequency = 'N/A';
+                    period = 'N/A';
+                } else {
+                    dampingType = '过阻尼';
+                    frequency = 'N/A';
+                    period = 'N/A';
+                }
+
+                document.getElementById('damped-dampingType').textContent = dampingType;
+                document.getElementById('damped-frequency').textContent = frequency;
+                document.getElementById('damped-period').textContent = period;
+            },
+
+            // 绘制主动画
+            drawMainAnimation() {
+                const canvas = this.canvases.animation;
+                const ctx = this.contexts.animation;
+                
+                if (!canvas || !ctx) return;
+
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+
+                if (this.data.position.length === 0) return;
+                
+                const index = Math.min(Math.floor(this.state.currentIndex), this.data.position.length - 1);
+                const currentPosition = this.data.position[index];
+                const currentVelocity = this.data.velocity[index];
+                const currentTime = this.data.time[index];
+
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = Math.min(width, height) / 12;
+
+                // 支撑点
+                ctx.fillStyle = '#333';
+                ctx.fillRect(centerX - 40, 20, 80, 10);
+
+                // 弹簧
+                ctx.strokeStyle = '#4a90e2';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const springTop = 30;
+                const springBottom = centerY + currentPosition * scale;
+                const coils = 12;
+                const coilHeight = (springBottom - springTop) / coils;
+                
+                ctx.moveTo(centerX, springTop);
+                for (let i = 0; i < coils; i++) {
+                    const y = springTop + i * coilHeight;
+                    const nextY = springTop + (i + 1) * coilHeight;
+                    const midY = (y + nextY) / 2;
+                    
+                    if (i % 2 === 0) {
+                        ctx.quadraticCurveTo(centerX + 20, midY, centerX, nextY);
+                    } else {
+                        ctx.quadraticCurveTo(centerX - 20, midY, centerX, nextY);
+                    }
+                }
+                ctx.stroke();
+
+                // 质量块
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(centerX - 30, springBottom - 30, 60, 60);
+                
+                // 参考线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 当前值
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.fillText(`位置: ${currentPosition.toFixed(3)} m`, 10, height - 40);
+                ctx.fillText(`速度: ${currentVelocity.toFixed(3)} m/s`, 10, height - 20);
+
+                document.getElementById('damped-currentTime').textContent = currentTime.toFixed(2) + ' s';
+            },
+
+            // 绘制图表
+            drawDisplacementChart() {
+                const ctx = this.contexts.displacement;
+                if (!ctx) return;
+                this.drawLineChart(ctx, this.data.time, this.data.position, '时间 (s)', '位移 (m)', '#3498db', true, '#e67e22');
+            },
+
+            drawVelocityChart() {
+                const ctx = this.contexts.velocity;
+                if (!ctx) return;
+                this.drawLineChart(ctx, this.data.time, this.data.velocity, '时间 (s)', '速度 (m/s)', '#e74c3c', true, '#3498db');
+            },
+
+            drawEnergyChart() {
+                const ctx = this.contexts.energy;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                this.drawLine(ctx, this.data.time, this.data.kineticEnergy, '#e74c3c', width, height);
+                this.drawLine(ctx, this.data.time, this.data.potentialEnergy, '#3498db', width, height);
+                this.drawLine(ctx, this.data.time, this.data.totalEnergy, '#2c3e50', width, height);
+                
+                // 图例
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(width - 100, 20, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('动能', width - 80, 32);
+                
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(width - 100, 40, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('势能', width - 80, 52);
+                
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(width - 100, 60, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('总能量', width - 80, 72);
+            },
+
+            // 通用绘图函数
+            drawLineChart(ctx, xData, yData, xLabel, yLabel, color, showMarker = true, markerColor = '#e67e22') {
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(width - 20, height - 30);
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(40, 20);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText(xLabel, width / 2 - 20, height - 5);
+                
+                ctx.save();
+                ctx.translate(15, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(yLabel, 0, 0);
+                ctx.restore();
+                
+                this.drawLine(ctx, xData, yData, color, width, height);
+                
+                // 标记当前点
+                if (showMarker && this.state.currentIndex < xData.length) {
+                    const index = Math.floor(this.state.currentIndex);
+                    const xMin = Math.min(...xData);
+                    const xMax = Math.max(...xData);
+                    const yMin = Math.min(...yData);
+                    const yMax = Math.max(...yData);
+                    
+                    const x = 40 + (xData[index] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[index] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    ctx.fillStyle = markerColor;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            },
+
+            drawLine(ctx, xData, yData, color, width, height) {
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const xMin = Math.min(...xData);
+                const xMax = Math.max(...xData);
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const x = 40 + (xData[i] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[i] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            },
+
+            // 动画控制
+            animate() {
+                if (!this.state.isPlaying) return;
+                
+                this.state.currentIndex += this.state.animationSpeed;
+                
+                if (this.state.currentIndex >= this.data.time.length) {
+                    this.state.currentIndex = 0;
+                }
+                
+                this.drawMainAnimation();
+                
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+                
+                this.state.animationId = requestAnimationFrame(() => this.animate());
+            },
+
+            startAnimation() {
+                if (!this.state.isPlaying && this.state.initialized) {
+                    this.state.isPlaying = true;
+                    document.getElementById('damped-startBtn').disabled = true;
+                    document.getElementById('damped-pauseBtn').disabled = false;
+                    this.animate();
+                }
+            },
+
+            pauseAnimation() {
+                this.state.isPlaying = false;
+                if (this.state.animationId) {
+                    cancelAnimationFrame(this.state.animationId);
+                }
+                document.getElementById('damped-startBtn').disabled = false;
+                document.getElementById('damped-pauseBtn').disabled = true;
+            },
+
+            resetAnimation() {
+                this.pauseAnimation();
+                this.state.currentIndex = 0;
+                this.calculatePhysics();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            toggleCharts() {
+                this.state.chartsVisible = !this.state.chartsVisible;
+                const chartsContent = document.getElementById('damped-chartsContent');
+                const toggleBtn = document.getElementById('damped-toggleChartsBtn');
+                
+                if (this.state.chartsVisible) {
+                    chartsContent.classList.add('active');
+                    toggleBtn.textContent = '隐藏图表';
+                    
+                    setTimeout(() => {
+                        ['displacement', 'velocity', 'energy'].forEach(id => {
+                            const canvas = document.getElementById('damped-' + id + 'Canvas');
+                            if (canvas) {
+                                this.setCanvasSize(canvas);
+                                if (!this.contexts[id]) {
+                                    this.contexts[id] = canvas.getContext('2d');
+                                }
+                            }
+                        });
+                        
+                        this.drawDisplacementChart();
+                        this.drawVelocityChart();
+                        this.drawEnergyChart();
+                    }, 50);
+                } else {
+                    chartsContent.classList.remove('active');
+                    toggleBtn.textContent = '显示图表';
+                }
+            },
+
+            switchTab(tabName) {
+                document.querySelectorAll('#damped-chartsContent .tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.tab === tabName) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                document.querySelectorAll('#damped-chartsContent .chart-canvas').forEach(canvas => {
+                    canvas.classList.remove('active');
+                });
+                
+                const targetCanvas = document.getElementById('damped-' + tabName + 'Canvas');
+                if (targetCanvas) {
+                    targetCanvas.classList.add('active');
+                    
+                    switch(tabName) {
+                        case 'displacement':
+                            this.drawDisplacementChart();
+                            break;
+                        case 'velocity':
+                            this.drawVelocityChart();
+                            break;
+                        case 'energy':
+                            this.drawEnergyChart();
+                            break;
+                    }
+                }
+            },
+
+            drawCurrentChart() {
+                if (!this.state.chartsVisible) return;
+                
+                const activeCanvas = document.querySelector('#damped-chartsContent .chart-canvas.active');
+                if (!activeCanvas) return;
+                
+                const canvasId = activeCanvas.id;
+                
+                if (canvasId.includes('displacement')) {
+                    this.drawDisplacementChart();
+                } else if (canvasId.includes('velocity')) {
+                    this.drawVelocityChart();
+                } else if (canvasId.includes('energy')) {
+                    this.drawEnergyChart();
+                }
+            }
+        };
+
+        // ============= 受迫振动模拟器 =============
+        const forcedSim = {
+            // 状态
+            state: {
+                isPlaying: false,
+                currentIndex: 0,
+                animationId: null,
+                animationSpeed: 1.0,
+                chartsVisible: false,
+                initialized: false
+            },
+
+            // 物理参数
+            params: {
+                mass: 1,
+                springConstant: 10,
+                dampingCoefficient: 0.5,
+                forceAmplitude: 2,
+                forceFrequency: 3,
+                initialPosition: 0,
+                initialVelocity: 0
+            },
+
+            // 数据
+            data: {
+                time: [],
+                position: [],
+                velocity: [],
+                force: [],
+                kineticEnergy: [],
+                potentialEnergy: [],
+                totalEnergy: []
+            },
+
+            // 共振数据
+            resonanceData: {
+                frequencies: [],
+                amplitudes: [],
+                phases: []
+            },
+
+            // Canvas引用
+            canvases: {},
+            contexts: {},
+
+            // 初始化
+            init() {
+                this.initializeCanvases();
+                this.setupEventListeners();
+                this.calculatePhysics();
+                this.calculateResonanceCurve();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                this.state.initialized = true;
+            },
+
+            // 初始化Canvas
+            initializeCanvases() {
+                const animCanvas = document.getElementById('forced-animationCanvas');
+                if (animCanvas) {
+                    this.canvases.animation = animCanvas;
+                    this.contexts.animation = animCanvas.getContext('2d');
+                    this.setCanvasSize(animCanvas);
+                }
+
+                ['displacement', 'velocity', 'energy', 'resonance'].forEach(id => {
+                    const canvas = document.getElementById('forced-' + id + 'Canvas');
+                    if (canvas) {
+                        this.canvases[id] = canvas;
+                        this.contexts[id] = canvas.getContext('2d');
+                        this.setCanvasSize(canvas);
+                    }
+                });
+            },
+
+            setCanvasSize(canvas) {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            },
+
+            handleResize() {
+                Object.values(this.canvases).forEach(canvas => {
+                    if (canvas) this.setCanvasSize(canvas);
+                });
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            setupEventListeners() {
+                const self = this;
+                
+                document.getElementById('forced-startBtn').addEventListener('click', () => self.startAnimation());
+                document.getElementById('forced-pauseBtn').addEventListener('click', () => self.pauseAnimation());
+                document.getElementById('forced-resetBtn').addEventListener('click', () => self.resetAnimation());
+                document.getElementById('forced-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+
+                document.querySelectorAll('#forced-chartsContent .tab-button').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        self.switchTab(this.dataset.tab);
+                    });
+                });
+
+                this.setupParameterListeners();
+
+                const speedSlider = document.getElementById('forced-speedSlider');
+                speedSlider.addEventListener('input', function() {
+                    self.state.animationSpeed = parseFloat(this.value);
+                    document.getElementById('forced-speedDisplay').textContent = self.state.animationSpeed.toFixed(1) + 'x';
+                });
+            },
+
+            setupParameterListeners() {
+                const self = this;
+                const parameters = [
+                    { slider: 'forced-massSlider', input: 'forced-massInput', param: 'mass' },
+                    { slider: 'forced-springSlider', input: 'forced-springInput', param: 'springConstant' },
+                    { slider: 'forced-dampingSlider', input: 'forced-dampingInput', param: 'dampingCoefficient' },
+                    { slider: 'forced-forceSlider', input: 'forced-forceInput', param: 'forceAmplitude' },
+                    { slider: 'forced-frequencySlider', input: 'forced-frequencyInput', param: 'forceFrequency' },
+                    { slider: 'forced-positionSlider', input: 'forced-positionInput', param: 'initialPosition' },
+                    { slider: 'forced-velocitySlider', input: 'forced-velocityInput', param: 'initialVelocity' }
+                ];
+
+                parameters.forEach(({ slider, input, param }) => {
+                    const sliderEl = document.getElementById(slider);
+                    const inputEl = document.getElementById(input);
+
+                    sliderEl.addEventListener('input', function() {
+                        inputEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+
+                    inputEl.addEventListener('change', function() {
+                        sliderEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+                });
+            },
+
+            calculatePhysics() {
+                Object.keys(this.data).forEach(key => {
+                    this.data[key] = [];
+                });
+
+                const { mass, springConstant, dampingCoefficient, forceAmplitude, forceFrequency, initialPosition, initialVelocity } = this.params;
+
+                const dt = 0.02;
+                const t_max = 30;
+
+                let position = initialPosition;
+                let velocity = initialVelocity;
+
+                for (let t = 0; t <= t_max; t += dt) {
+                    this.data.time.push(t);
+                    this.data.position.push(position);
+                    this.data.velocity.push(velocity);
+
+                    const force = forceAmplitude * Math.cos(forceFrequency * t);
+                    this.data.force.push(force);
+
+                    const ke = 0.5 * mass * velocity * velocity;
+                    const pe = 0.5 * springConstant * position * position;
+                    this.data.kineticEnergy.push(ke);
+                    this.data.potentialEnergy.push(pe);
+                    this.data.totalEnergy.push(ke + pe);
+
+                    const acceleration = (force - dampingCoefficient * velocity - springConstant * position) / mass;
+                    velocity += acceleration * dt;
+                    position += velocity * dt;
+                }
+            },
+
+            calculateResonanceCurve() {
+                this.resonanceData.frequencies = [];
+                this.resonanceData.amplitudes = [];
+                this.resonanceData.phases = [];
+
+                const { mass, springConstant, dampingCoefficient, forceAmplitude } = this.params;
+                const omega_n = Math.sqrt(springConstant / mass);
+                const zeta = dampingCoefficient / (2 * Math.sqrt(mass * springConstant));
+
+                const omegaMin = 0.1 * omega_n;
+                const omegaMax = 3 * omega_n;
+                const numPoints = 100;
+
+                for (let i = 0; i < numPoints; i++) {
+                    const omega = omegaMin + (omegaMax - omegaMin) * i / (numPoints - 1);
+                    const r = omega / omega_n;
+
+                    const denominator = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(2 * zeta * r, 2));
+                    const amplitude = (forceAmplitude / springConstant) / denominator;
+                    const phase = Math.atan2(2 * zeta * r, 1 - r * r);
+
+                    this.resonanceData.frequencies.push(omega);
+                    this.resonanceData.amplitudes.push(amplitude);
+                    this.resonanceData.phases.push(phase);
+                }
+            },
+
+            updateSystemInfo() {
+                const { mass, springConstant, dampingCoefficient, forceAmplitude, forceFrequency } = this.params;
+                
+                const omega_n = Math.sqrt(springConstant / mass);
+                const zeta = dampingCoefficient / (2 * Math.sqrt(mass * springConstant));
+                const frequencyRatio = forceFrequency / omega_n;
+
+                const denominator = Math.sqrt(Math.pow(springConstant - mass * forceFrequency * forceFrequency, 2) + 
+                                             Math.pow(dampingCoefficient * forceFrequency, 2));
+                const steadyAmplitude = forceAmplitude / denominator;
+                const phase = Math.atan2(dampingCoefficient * forceFrequency, springConstant - mass * forceFrequency * forceFrequency);
+
+                document.getElementById('forced-naturalFrequency').textContent = omega_n.toFixed(3) + ' rad/s';
+                document.getElementById('forced-frequencyRatio').textContent = frequencyRatio.toFixed(3);
+                document.getElementById('forced-steadyAmplitude').textContent = steadyAmplitude.toFixed(3) + ' m';
+                document.getElementById('forced-phaseDifference').textContent = (phase * 180 / Math.PI).toFixed(1) + '°';
+            },
+
+            drawMainAnimation() {
+                const canvas = this.canvases.animation;
+                const ctx = this.contexts.animation;
+                
+                if (!canvas || !ctx) return;
+
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+
+                if (this.data.position.length === 0) return;
+                
+                const index = Math.min(Math.floor(this.state.currentIndex), this.data.position.length - 1);
+                const currentPosition = this.data.position[index];
+                const currentVelocity = this.data.velocity[index];
+                const currentForce = this.data.force[index];
+                const currentTime = this.data.time[index];
+
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = Math.min(width, height) / 12;
+
+                // 支撑点
+                ctx.fillStyle = '#333';
+                ctx.fillRect(centerX - 40, 20, 80, 10);
+
+                // 弹簧
+                ctx.strokeStyle = '#4a90e2';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const springTop = 30;
+                const springBottom = centerY + currentPosition * scale;
+                const coils = 12;
+                const coilHeight = (springBottom - springTop) / coils;
+                
+                ctx.moveTo(centerX, springTop);
+                for (let i = 0; i < coils; i++) {
+                    const y = springTop + i * coilHeight;
+                    const nextY = springTop + (i + 1) * coilHeight;
+                    const midY = (y + nextY) / 2;
+                    
+                    if (i % 2 === 0) {
+                        ctx.quadraticCurveTo(centerX + 20, midY, centerX, nextY);
+                    } else {
+                        ctx.quadraticCurveTo(centerX - 20, midY, centerX, nextY);
+                    }
+                }
+                ctx.stroke();
+
+                // 质量块
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(centerX - 30, springBottom - 30, 60, 60);
+                
+                // 外力箭头
+                const forceScale = 15;
+                const forceLength = currentForce * forceScale;
+                const forceY = springBottom;
+                
+                ctx.strokeStyle = '#27ae60';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(centerX + 60, forceY);
+                ctx.lineTo(centerX + 60 + forceLength, forceY);
+                ctx.stroke();
+                
+                if (Math.abs(forceLength) > 5) {
+                    ctx.beginPath();
+                    const arrowDir = forceLength > 0 ? 1 : -1;
+                    ctx.moveTo(centerX + 60 + forceLength, forceY);
+                    ctx.lineTo(centerX + 60 + forceLength - 10 * arrowDir, forceY - 5);
+                    ctx.lineTo(centerX + 60 + forceLength - 10 * arrowDir, forceY + 5);
+                    ctx.closePath();
+                    ctx.fillStyle = '#27ae60';
+                    ctx.fill();
+                }
+                
+                // 参考线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 当前值
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.fillText(`位置: ${currentPosition.toFixed(3)} m`, 10, height - 60);
+                ctx.fillText(`速度: ${currentVelocity.toFixed(3)} m/s`, 10, height - 40);
+                ctx.fillText(`外力: ${currentForce.toFixed(3)} N`, 10, height - 20);
+
+                document.getElementById('forced-currentTime').textContent = currentTime.toFixed(2) + ' s';
+                document.getElementById('forced-currentForce').textContent = currentForce.toFixed(2) + ' N';
+            },
+
+            drawDisplacementChart() {
+                const ctx = this.contexts.displacement;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                const scale = 0.3;
+                const scaledForce = this.data.force.map(f => f * scale);
+                
+                this.drawLine(ctx, this.data.time, this.data.position, '#3498db', width, height);
+                this.drawLine(ctx, this.data.time, scaledForce, '#27ae60', width, height);
+                
+                // 标记当前点
+                if (this.state.currentIndex < this.data.time.length) {
+                    const index = Math.floor(this.state.currentIndex);
+                    const xMin = Math.min(...this.data.time);
+                    const xMax = Math.max(...this.data.time);
+                    const yMin = Math.min(...this.data.position, ...scaledForce);
+                    const yMax = Math.max(...this.data.position, ...scaledForce);
+                    
+                    const x = 40 + (this.data.time[index] - xMin) / (xMax - xMin) * (width - 60);
+                    const y1 = height - 30 - (this.data.position[index] - yMin) / (yMax - yMin) * (height - 50);
+                    const y2 = height - 30 - (scaledForce[index] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    ctx.fillStyle = '#e67e22';
+                    ctx.beginPath();
+                    ctx.arc(x, y1, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#95a5a6';
+                    ctx.beginPath();
+                    ctx.arc(x, y2, 4, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                
+                // 图例
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(width - 120, 20, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('位移', width - 100, 32);
+                
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(width - 120, 40, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('外力×0.3', width - 100, 52);
+                
+                ctx.fillStyle = '#333';
+                ctx.fillText('时间 (s)', width / 2 - 20, height - 5);
+            },
+
+            drawVelocityChart() {
+                const ctx = this.contexts.velocity;
+                if (!ctx) return;
+                this.drawLineChart(ctx, this.data.time, this.data.velocity, '时间 (s)', '速度 (m/s)', '#e74c3c', true, '#3498db');
+            },
+
+            drawEnergyChart() {
+                const ctx = this.contexts.energy;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                this.drawLine(ctx, this.data.time, this.data.kineticEnergy, '#e74c3c', width, height);
+                this.drawLine(ctx, this.data.time, this.data.potentialEnergy, '#3498db', width, height);
+                this.drawLine(ctx, this.data.time, this.data.totalEnergy, '#2c3e50', width, height);
+                
+                // 图例
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(width - 100, 20, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('动能', width - 80, 32);
+                
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(width - 100, 40, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('势能', width - 80, 52);
+                
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(width - 100, 60, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('总能量', width - 80, 72);
+            },
+
+            drawResonanceChart() {
+                const ctx = this.contexts.resonance;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                const omega_n = Math.sqrt(this.params.springConstant / this.params.mass);
+                const frequencyRatios = this.resonanceData.frequencies.map(f => f / omega_n);
+                
+                this.drawLine(ctx, frequencyRatios, this.resonanceData.amplitudes, '#e74c3c', width, height);
+                
+                // 标记当前工作点
+                const currentRatio = this.params.forceFrequency / omega_n;
+                const denominator = Math.sqrt(Math.pow(this.params.springConstant - this.params.mass * this.params.forceFrequency * this.params.forceFrequency, 2) + 
+                                             Math.pow(this.params.dampingCoefficient * this.params.forceFrequency, 2));
+                const currentAmplitude = this.params.forceAmplitude / denominator;
+                
+                const xMin = Math.min(...frequencyRatios);
+                const xMax = Math.max(...frequencyRatios);
+                const yMin = Math.min(...this.resonanceData.amplitudes);
+                const yMax = Math.max(...this.resonanceData.amplitudes);
+                
+                const x = 40 + (currentRatio - xMin) / (xMax - xMin) * (width - 60);
+                const y = height - 30 - (currentAmplitude - yMin) / (yMax - yMin) * (height - 50);
+                
+                ctx.fillStyle = '#27ae60';
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // 共振频率线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                const resonanceX = 40 + (1 - xMin) / (xMax - xMin) * (width - 60);
+                ctx.moveTo(resonanceX, 20);
+                ctx.lineTo(resonanceX, height - 30);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText('频率比 (ω/ωn)', width / 2 - 30, height - 5);
+                
+                ctx.save();
+                ctx.translate(15, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('振幅 (m)', 0, 0);
+                ctx.restore();
+                
+                // 图例
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(width - 120, 20, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('当前工作点', width - 100, 32);
+            },
+
+            drawLineChart(ctx, xData, yData, xLabel, yLabel, color, showMarker = true, markerColor = '#e67e22') {
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(width - 20, height - 30);
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(40, 20);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText(xLabel, width / 2 - 20, height - 5);
+                
+                ctx.save();
+                ctx.translate(15, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(yLabel, 0, 0);
+                ctx.restore();
+                
+                this.drawLine(ctx, xData, yData, color, width, height);
+                
+                // 标记当前点
+                if (showMarker && this.state.currentIndex < xData.length) {
+                    const index = Math.floor(this.state.currentIndex);
+                    const xMin = Math.min(...xData);
+                    const xMax = Math.max(...xData);
+                    const yMin = Math.min(...yData);
+                    const yMax = Math.max(...yData);
+                    
+                    const x = 40 + (xData[index] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[index] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    ctx.fillStyle = markerColor;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            },
+
+            drawLine(ctx, xData, yData, color, width, height) {
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const xMin = Math.min(...xData);
+                const xMax = Math.max(...xData);
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const x = 40 + (xData[i] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[i] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            },
+
+            animate() {
+                if (!this.state.isPlaying) return;
+                
+                this.state.currentIndex += this.state.animationSpeed;
+                
+                if (this.state.currentIndex >= this.data.time.length) {
+                    this.state.currentIndex = 0;
+                }
+                
+                this.drawMainAnimation();
+                
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+                
+                this.state.animationId = requestAnimationFrame(() => this.animate());
+            },
+
+            startAnimation() {
+                if (!this.state.isPlaying && this.state.initialized) {
+                    this.state.isPlaying = true;
+                    document.getElementById('forced-startBtn').disabled = true;
+                    document.getElementById('forced-pauseBtn').disabled = false;
+                    this.animate();
+                }
+            },
+
+            pauseAnimation() {
+                this.state.isPlaying = false;
+                if (this.state.animationId) {
+                    cancelAnimationFrame(this.state.animationId);
+                }
+                document.getElementById('forced-startBtn').disabled = false;
+                document.getElementById('forced-pauseBtn').disabled = true;
+            },
+
+            resetAnimation() {
+                this.pauseAnimation();
+                this.state.currentIndex = 0;
+                this.calculatePhysics();
+                this.calculateResonanceCurve();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            toggleCharts() {
+                this.state.chartsVisible = !this.state.chartsVisible;
+                const chartsContent = document.getElementById('forced-chartsContent');
+                const toggleBtn = document.getElementById('forced-toggleChartsBtn');
+                
+                if (this.state.chartsVisible) {
+                    chartsContent.classList.add('active');
+                    toggleBtn.textContent = '隐藏图表';
+                    
+                    setTimeout(() => {
+                        ['displacement', 'velocity', 'energy', 'resonance'].forEach(id => {
+                            const canvas = document.getElementById('forced-' + id + 'Canvas');
+                            if (canvas) {
+                                this.setCanvasSize(canvas);
+                                if (!this.contexts[id]) {
+                                    this.contexts[id] = canvas.getContext('2d');
+                                }
+                            }
+                        });
+                        
+                        this.drawDisplacementChart();
+                        this.drawVelocityChart();
+                        this.drawEnergyChart();
+                        this.drawResonanceChart();
+                    }, 50);
+                } else {
+                    chartsContent.classList.remove('active');
+                    toggleBtn.textContent = '显示图表';
+                }
+            },
+
+            switchTab(tabName) {
+                document.querySelectorAll('#forced-chartsContent .tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.tab === tabName) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                document.querySelectorAll('#forced-chartsContent .chart-canvas').forEach(canvas => {
+                    canvas.classList.remove('active');
+                });
+                
+                const targetCanvas = document.getElementById('forced-' + tabName + 'Canvas');
+                if (targetCanvas) {
+                    targetCanvas.classList.add('active');
+                    
+                    switch(tabName) {
+                        case 'displacement':
+                            this.drawDisplacementChart();
+                            break;
+                        case 'velocity':
+                            this.drawVelocityChart();
+                            break;
+                        case 'energy':
+                            this.drawEnergyChart();
+                            break;
+                        case 'resonance':
+                            this.drawResonanceChart();
+                            break;
+                    }
+                }
+            },
+
+            drawCurrentChart() {
+                if (!this.state.chartsVisible) return;
+                
+                const activeCanvas = document.querySelector('#forced-chartsContent .chart-canvas.active');
+                if (!activeCanvas) return;
+                
+                const canvasId = activeCanvas.id;
+                
+                if (canvasId.includes('displacement')) {
+                    this.drawDisplacementChart();
+                } else if (canvasId.includes('velocity')) {
+                    this.drawVelocityChart();
+                } else if (canvasId.includes('energy')) {
+                    this.drawEnergyChart();
+                } else if (canvasId.includes('resonance')) {
+                    this.drawResonanceChart();
+                }
+            }
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            dampedSim.init();
+            forcedSim.init();
+            
+            // 窗口调整事件
+            window.addEventListener('resize', () => {
+                if (currentSimulator === 'damped') {
+                    dampedSim.handleResize();
+                } else {
+                    forcedSim.handleResize();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
