@@ -1589,28 +1589,35 @@
                 ctx.fillStyle = '#e74c3c';
                 ctx.fillRect(centerX - 30, springBottom - 30, 60, 60);
                 
-                // 外力箭头
+                // 外力箭头（修正为垂直方向）
                 const forceScale = 15;
                 const forceLength = currentForce * forceScale;
-                const forceY = springBottom;
+                const forceX = centerX;
+                const forceBaseY = springBottom;
                 
                 ctx.strokeStyle = '#27ae60';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(centerX + 60, forceY);
-                ctx.lineTo(centerX + 60 + forceLength, forceY);
+                ctx.moveTo(forceX, forceBaseY);
+                ctx.lineTo(forceX, forceBaseY + forceLength);
                 ctx.stroke();
                 
+                // 绘制箭头头部
                 if (Math.abs(forceLength) > 5) {
                     ctx.beginPath();
                     const arrowDir = forceLength > 0 ? 1 : -1;
-                    ctx.moveTo(centerX + 60 + forceLength, forceY);
-                    ctx.lineTo(centerX + 60 + forceLength - 10 * arrowDir, forceY - 5);
-                    ctx.lineTo(centerX + 60 + forceLength - 10 * arrowDir, forceY + 5);
+                    ctx.moveTo(forceX, forceBaseY + forceLength);
+                    ctx.lineTo(forceX - 5, forceBaseY + forceLength - 10 * arrowDir);
+                    ctx.lineTo(forceX + 5, forceBaseY + forceLength - 10 * arrowDir);
                     ctx.closePath();
                     ctx.fillStyle = '#27ae60';
                     ctx.fill();
                 }
+                
+                // 在箭头旁边添加"F"标签
+                ctx.fillStyle = '#27ae60';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText('F', forceX + 15, forceBaseY + forceLength / 2);
                 
                 // 参考线
                 ctx.strokeStyle = '#95a5a6';
