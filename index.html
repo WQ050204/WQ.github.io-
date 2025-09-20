@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="振动系统综合模拟器 - 交互式物理教学工具，包含阻尼振动和受迫振动模拟，实时动画演示和数据分析">
-    <meta name="keywords" content="物理模拟器,阻尼振动,受迫振动,共振,物理教学,oscillation,damped oscillation,forced oscillation">
+    <meta name="description" content="振动系统综合模拟器 - 交互式物理教学工具，包含简谐振动、阻尼振动和受迫振动模拟，实时动画演示和数据分析">
+    <meta name="keywords" content="物理模拟器,简谐振动,阻尼振动,受迫振动,共振,物理教学,simple harmonic motion,damped oscillation,forced oscillation">
     <meta name="author" content="Physics Simulator">
     
     <!-- Open Graph Tags for Social Media -->
     <meta property="og:title" content="振动系统综合模拟器">
-    <meta property="og:description" content="交互式物理教学工具 - 阻尼振动与受迫振动实时模拟">
+    <meta property="og:description" content="交互式物理教学工具 - 简谐振动、阻尼振动与受迫振动实时模拟">
     <meta property="og:type" content="website">
     <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎯</text></svg>">
     
@@ -59,7 +59,7 @@
             border-radius: 15px;
             padding: 10px;
             margin: 15px auto;
-            max-width: 500px;
+            max-width: 600px;
             display: flex;
             gap: 10px;
         }
@@ -441,18 +441,131 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎯 振动系统综合模拟器</h1>
+            <h1>振动系统综合模拟器</h1>
             <p>交互式物理教学工具 | Interactive Physics Teaching Tool</p>
         </div>
 
         <!-- 模拟器选择器 -->
         <div class="simulator-selector">
-            <button class="selector-btn active" onclick="switchSimulator('damped')">阻尼振动</button>
+            <button class="selector-btn active" onclick="switchSimulator('simple')">简谐振动</button>
+            <button class="selector-btn" onclick="switchSimulator('damped')">阻尼振动</button>
             <button class="selector-btn" onclick="switchSimulator('forced')">受迫振动</button>
         </div>
 
+        <!-- 简谐振动模拟器 -->
+        <div id="simpleSimulator" class="simulator-container active">
+            <div class="main-content">
+                <!-- 参数设置 -->
+                <div class="parameters-section">
+                    <div class="parameter-group">
+                        <label>质量 Mass (kg)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="simple-massSlider" min="0.1" max="5" step="0.1" value="1">
+                            <input type="number" id="simple-massInput" min="0.1" max="5" step="0.1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>弹簧常数 Spring Constant (N/m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="simple-springSlider" min="1" max="50" step="0.5" value="10">
+                            <input type="number" id="simple-springInput" min="1" max="50" step="0.5" value="10">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始位置 Initial Position (m)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="simple-positionSlider" min="-3" max="3" step="0.1" value="2">
+                            <input type="number" id="simple-positionInput" min="-3" max="3" step="0.1" value="2">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group">
+                        <label>初始速度 Initial Velocity (m/s)</label>
+                        <div class="parameter-input">
+                            <input type="range" id="simple-velocitySlider" min="-5" max="5" step="0.1" value="0">
+                            <input type="number" id="simple-velocityInput" min="-5" max="5" step="0.1" value="0">
+                        </div>
+                    </div>
+
+                    <div class="parameter-group speed-control">
+                        <label>动画速度 Animation Speed</label>
+                        <div class="parameter-input">
+                            <input type="range" id="simple-speedSlider" min="0.1" max="3" step="0.1" value="1">
+                            <span id="simple-speedDisplay">1.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制按钮 -->
+                <div class="control-buttons">
+                    <button class="control-button start-btn" id="simple-startBtn">▶ 开始</button>
+                    <button class="control-button pause-btn" id="simple-pauseBtn">⏸ 暂停</button>
+                    <button class="control-button reset-btn" id="simple-resetBtn">↺ 重置</button>
+                </div>
+
+                <!-- 系统信息 -->
+                <div class="info-section">
+                    <div class="info-item">
+                        <span class="info-label">角频率:</span>
+                        <span class="info-value" id="simple-angularFrequency">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">振动频率:</span>
+                        <span class="info-value" id="simple-frequency">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">振动周期:</span>
+                        <span class="info-value" id="simple-period">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">振幅:</span>
+                        <span class="info-value" id="simple-amplitude">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">总能量:</span>
+                        <span class="info-value" id="simple-totalEnergy">计算中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">当前时间:</span>
+                        <span class="info-value" id="simple-currentTime">0.00 s</span>
+                    </div>
+                </div>
+
+                <!-- 主动画 -->
+                <div class="animation-container">
+                    <canvas id="simple-animationCanvas" class="animation-canvas"></canvas>
+                </div>
+
+                <!-- 图表 -->
+                <div class="charts-section">
+                    <div class="charts-header">
+                        <span class="charts-title">📊 详细图表分析</span>
+                        <button class="show-charts-btn" id="simple-toggleChartsBtn">显示图表</button>
+                    </div>
+                    
+                    <div class="charts-content" id="simple-chartsContent">
+                        <div class="tabs">
+                            <button class="tab-button active" data-tab="displacement">位移</button>
+                            <button class="tab-button" data-tab="velocity">速度</button>
+                            <button class="tab-button" data-tab="energy">能量</button>
+                            <button class="tab-button" data-tab="phase">相位图</button>
+                        </div>
+
+                        <div class="charts-canvas-container">
+                            <canvas id="simple-displacementCanvas" class="chart-canvas active"></canvas>
+                            <canvas id="simple-velocityCanvas" class="chart-canvas"></canvas>
+                            <canvas id="simple-energyCanvas" class="chart-canvas"></canvas>
+                            <canvas id="simple-phaseCanvas" class="chart-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 阻尼振动模拟器 -->
-        <div id="dampedSimulator" class="simulator-container active">
+        <div id="dampedSimulator" class="simulator-container">
             <div class="main-content">
                 <!-- 参数设置 -->
                 <div class="parameters-section">
@@ -709,7 +822,7 @@
 
         <!-- Footer -->
         <div class="footer">
-            <p>© 2024 振动系统综合模拟器 | Created with ❤️ for Physics Education</p>
+            <p>© 2025 振动系统综合模拟器 | Created with ❤️ for Physics Education</p>
             <p>
                 <a href="https://github.com" target="_blank">View on GitHub</a> | 
                 <a href="mailto:contact@example.com">Contact</a>
@@ -723,12 +836,14 @@
         // ============================================
         
         // 当前活动的模拟器
-        let currentSimulator = 'damped';
+        let currentSimulator = 'simple';
 
         // 切换模拟器
         function switchSimulator(type) {
             // 停止当前模拟器
-            if (currentSimulator === 'damped') {
+            if (currentSimulator === 'simple') {
+                simpleSim.pauseAnimation();
+            } else if (currentSimulator === 'damped') {
                 dampedSim.pauseAnimation();
             } else {
                 forcedSim.pauseAnimation();
@@ -742,7 +857,13 @@
                 btn.classList.remove('active');
             });
 
-            if (type === 'damped') {
+            if (type === 'simple') {
+                document.getElementById('simpleSimulator').classList.add('active');
+                document.querySelector('[onclick="switchSimulator(\'simple\')"]').classList.add('active');
+                currentSimulator = 'simple';
+                // 重新设置canvas尺寸
+                setTimeout(() => simpleSim.handleResize(), 100);
+            } else if (type === 'damped') {
                 document.getElementById('dampedSimulator').classList.add('active');
                 document.querySelector('[onclick="switchSimulator(\'damped\')"]').classList.add('active');
                 currentSimulator = 'damped';
@@ -756,6 +877,600 @@
                 setTimeout(() => forcedSim.handleResize(), 100);
             }
         }
+
+        // ============= 简谐振动模拟器 =============
+        const simpleSim = {
+            // 状态
+            state: {
+                isPlaying: false,
+                currentIndex: 0,
+                animationId: null,
+                animationSpeed: 1.0,
+                chartsVisible: false,
+                initialized: false
+            },
+
+            // 物理参数
+            params: {
+                mass: 1,
+                springConstant: 10,
+                initialPosition: 2,
+                initialVelocity: 0
+            },
+
+            // 数据数组
+            data: {
+                time: [],
+                position: [],
+                velocity: [],
+                acceleration: [],
+                kineticEnergy: [],
+                potentialEnergy: [],
+                totalEnergy: []
+            },
+
+            // Canvas引用
+            canvases: {},
+            contexts: {},
+
+            // 初始化
+            init() {
+                this.initializeCanvases();
+                this.setupEventListeners();
+                this.calculatePhysics();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                this.state.initialized = true;
+            },
+
+            // 初始化Canvas
+            initializeCanvases() {
+                const animCanvas = document.getElementById('simple-animationCanvas');
+                if (animCanvas) {
+                    this.canvases.animation = animCanvas;
+                    this.contexts.animation = animCanvas.getContext('2d');
+                    this.setCanvasSize(animCanvas);
+                }
+
+                ['displacement', 'velocity', 'energy', 'phase'].forEach(id => {
+                    const canvas = document.getElementById('simple-' + id + 'Canvas');
+                    if (canvas) {
+                        this.canvases[id] = canvas;
+                        this.contexts[id] = canvas.getContext('2d');
+                        this.setCanvasSize(canvas);
+                    }
+                });
+            },
+
+            // 设置Canvas尺寸
+            setCanvasSize(canvas) {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            },
+
+            // 处理窗口调整
+            handleResize() {
+                Object.values(this.canvases).forEach(canvas => {
+                    if (canvas) this.setCanvasSize(canvas);
+                });
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            // 设置事件监听器
+            setupEventListeners() {
+                const self = this;
+                
+                document.getElementById('simple-startBtn').addEventListener('click', () => self.startAnimation());
+                document.getElementById('simple-pauseBtn').addEventListener('click', () => self.pauseAnimation());
+                document.getElementById('simple-resetBtn').addEventListener('click', () => self.resetAnimation());
+                document.getElementById('simple-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+
+                // 标签页
+                document.querySelectorAll('#simple-chartsContent .tab-button').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        self.switchTab(this.dataset.tab);
+                    });
+                });
+
+                // 参数监听器
+                this.setupParameterListeners();
+
+                // 速度控制
+                const speedSlider = document.getElementById('simple-speedSlider');
+                speedSlider.addEventListener('input', function() {
+                    self.state.animationSpeed = parseFloat(this.value);
+                    document.getElementById('simple-speedDisplay').textContent = self.state.animationSpeed.toFixed(1) + 'x';
+                });
+            },
+
+            // 设置参数监听器
+            setupParameterListeners() {
+                const self = this;
+                const parameters = [
+                    { slider: 'simple-massSlider', input: 'simple-massInput', param: 'mass' },
+                    { slider: 'simple-springSlider', input: 'simple-springInput', param: 'springConstant' },
+                    { slider: 'simple-positionSlider', input: 'simple-positionInput', param: 'initialPosition' },
+                    { slider: 'simple-velocitySlider', input: 'simple-velocityInput', param: 'initialVelocity' }
+                ];
+
+                parameters.forEach(({ slider, input, param }) => {
+                    const sliderEl = document.getElementById(slider);
+                    const inputEl = document.getElementById(input);
+
+                    sliderEl.addEventListener('input', function() {
+                        inputEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+
+                    inputEl.addEventListener('change', function() {
+                        sliderEl.value = this.value;
+                        self.params[param] = parseFloat(this.value);
+                        self.resetAnimation();
+                    });
+                });
+            },
+
+            // 计算物理数据
+            calculatePhysics() {
+                Object.keys(this.data).forEach(key => {
+                    this.data[key] = [];
+                });
+
+                const { mass, springConstant, initialPosition, initialVelocity } = this.params;
+                const omega = Math.sqrt(springConstant / mass);
+                const dt = 0.05;
+                const t_max = 20;
+
+                // 计算振幅和相位
+                const A = Math.sqrt(initialPosition * initialPosition + 
+                                  Math.pow(initialVelocity / omega, 2));
+                const phi = Math.atan2(-initialVelocity / omega, initialPosition);
+
+                for (let t = 0; t <= t_max; t += dt) {
+                    this.data.time.push(t);
+
+                    // 简谐振动方程
+                    const position = A * Math.cos(omega * t + phi);
+                    const velocity = -A * omega * Math.sin(omega * t + phi);
+                    const acceleration = -omega * omega * position;
+
+                    this.data.position.push(position);
+                    this.data.velocity.push(velocity);
+                    this.data.acceleration.push(acceleration);
+
+                    // 能量计算
+                    const ke = 0.5 * mass * velocity * velocity;
+                    const pe = 0.5 * springConstant * position * position;
+                    const total = ke + pe;
+
+                    this.data.kineticEnergy.push(ke);
+                    this.data.potentialEnergy.push(pe);
+                    this.data.totalEnergy.push(total);
+                }
+            },
+
+            // 更新系统信息
+            updateSystemInfo() {
+                const { mass, springConstant, initialPosition, initialVelocity } = this.params;
+                const omega = Math.sqrt(springConstant / mass);
+                const frequency = omega / (2 * Math.PI);
+                const period = 2 * Math.PI / omega;
+                
+                // 计算振幅
+                const amplitude = Math.sqrt(initialPosition * initialPosition + 
+                                          Math.pow(initialVelocity / omega, 2));
+                
+                // 总能量（守恒）
+                const totalEnergy = 0.5 * springConstant * amplitude * amplitude;
+
+                document.getElementById('simple-angularFrequency').textContent = omega.toFixed(3) + ' rad/s';
+                document.getElementById('simple-frequency').textContent = frequency.toFixed(3) + ' Hz';
+                document.getElementById('simple-period').textContent = period.toFixed(3) + ' s';
+                document.getElementById('simple-amplitude').textContent = amplitude.toFixed(3) + ' m';
+                document.getElementById('simple-totalEnergy').textContent = totalEnergy.toFixed(3) + ' J';
+            },
+
+            // 绘制主动画
+            drawMainAnimation() {
+                const canvas = this.canvases.animation;
+                const ctx = this.contexts.animation;
+                
+                if (!canvas || !ctx) return;
+
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+
+                if (this.data.position.length === 0) return;
+                
+                const index = Math.min(Math.floor(this.state.currentIndex), this.data.position.length - 1);
+                const currentPosition = this.data.position[index];
+                const currentVelocity = this.data.velocity[index];
+                const currentTime = this.data.time[index];
+
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = Math.min(width, height) / 12;
+
+                // 支撑点
+                ctx.fillStyle = '#333';
+                ctx.fillRect(centerX - 40, 20, 80, 10);
+
+                // 弹簧
+                ctx.strokeStyle = '#4a90e2';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const springTop = 30;
+                const springBottom = centerY + currentPosition * scale;
+                const coils = 12;
+                const coilHeight = (springBottom - springTop) / coils;
+                
+                ctx.moveTo(centerX, springTop);
+                for (let i = 0; i < coils; i++) {
+                    const y = springTop + i * coilHeight;
+                    const nextY = springTop + (i + 1) * coilHeight;
+                    const midY = (y + nextY) / 2;
+                    
+                    if (i % 2 === 0) {
+                        ctx.quadraticCurveTo(centerX + 20, midY, centerX, nextY);
+                    } else {
+                        ctx.quadraticCurveTo(centerX - 20, midY, centerX, nextY);
+                    }
+                }
+                ctx.stroke();
+
+                // 质量块
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(centerX - 30, springBottom - 30, 60, 60);
+                
+                // 参考线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 当前值
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.fillText(`位置: ${currentPosition.toFixed(3)} m`, 10, height - 40);
+                ctx.fillText(`速度: ${currentVelocity.toFixed(3)} m/s`, 10, height - 20);
+
+                document.getElementById('simple-currentTime').textContent = currentTime.toFixed(2) + ' s';
+            },
+
+            // 绘制图表
+            drawDisplacementChart() {
+                const ctx = this.contexts.displacement;
+                if (!ctx) return;
+                this.drawLineChart(ctx, this.data.time, this.data.position, '时间 (s)', '位移 (m)', '#3498db', true, '#e67e22');
+            },
+
+            drawVelocityChart() {
+                const ctx = this.contexts.velocity;
+                if (!ctx) return;
+                this.drawLineChart(ctx, this.data.time, this.data.velocity, '时间 (s)', '速度 (m/s)', '#e74c3c', true, '#3498db');
+            },
+
+            drawEnergyChart() {
+                const ctx = this.contexts.energy;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                this.drawLine(ctx, this.data.time, this.data.kineticEnergy, '#e74c3c', width, height);
+                this.drawLine(ctx, this.data.time, this.data.potentialEnergy, '#3498db', width, height);
+                this.drawLine(ctx, this.data.time, this.data.totalEnergy, '#2c3e50', width, height);
+                
+                // 图例
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(width - 100, 20, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('动能', width - 80, 32);
+                
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(width - 100, 40, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('势能', width - 80, 52);
+                
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(width - 100, 60, 15, 15);
+                ctx.fillStyle = '#333';
+                ctx.fillText('总能量', width - 80, 72);
+            },
+
+            drawPhaseChart() {
+                const ctx = this.contexts.phase;
+                if (!ctx) return;
+                
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(width / 2, 20);
+                ctx.lineTo(width / 2, height - 30);
+                ctx.moveTo(40, height / 2);
+                ctx.lineTo(width - 20, height / 2);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText('位移 (m)', width - 60, height / 2 - 10);
+                ctx.fillText('速度 (m/s)', width / 2 + 10, 35);
+                
+                // 绘制相位轨迹
+                const xMin = Math.min(...this.data.position);
+                const xMax = Math.max(...this.data.position);
+                const vMin = Math.min(...this.data.velocity);
+                const vMax = Math.max(...this.data.velocity);
+                
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < this.data.position.length; i++) {
+                    const x = width / 2 + (this.data.position[i] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width / 2 - 40);
+                    const y = height / 2 - (this.data.velocity[i] / Math.max(Math.abs(vMin), Math.abs(vMax))) * (height / 2 - 40);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前点
+                if (this.state.currentIndex < this.data.position.length) {
+                    const index = Math.floor(this.state.currentIndex);
+                    const x = width / 2 + (this.data.position[index] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width / 2 - 40);
+                    const y = height / 2 - (this.data.velocity[index] / Math.max(Math.abs(vMin), Math.abs(vMax))) * (height / 2 - 40);
+                    
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            },
+
+            // 通用绘图函数
+            drawLineChart(ctx, xData, yData, xLabel, yLabel, color, showMarker = true, markerColor = '#e67e22') {
+                const canvas = ctx.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(width - 20, height - 30);
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(40, 20);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText(xLabel, width / 2 - 20, height - 5);
+                
+                ctx.save();
+                ctx.translate(15, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(yLabel, 0, 0);
+                ctx.restore();
+                
+                this.drawLine(ctx, xData, yData, color, width, height);
+                
+                // 标记当前点
+                if (showMarker && this.state.currentIndex < xData.length) {
+                    const index = Math.floor(this.state.currentIndex);
+                    const xMin = Math.min(...xData);
+                    const xMax = Math.max(...xData);
+                    const yMin = Math.min(...yData);
+                    const yMax = Math.max(...yData);
+                    
+                    const x = 40 + (xData[index] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[index] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    ctx.fillStyle = markerColor;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            },
+
+            drawLine(ctx, xData, yData, color, width, height) {
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const xMin = Math.min(...xData);
+                const xMax = Math.max(...xData);
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const x = 40 + (xData[i] - xMin) / (xMax - xMin) * (width - 60);
+                    const y = height - 30 - (yData[i] - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            },
+
+            // 动画控制
+            animate() {
+                if (!this.state.isPlaying) return;
+                
+                this.state.currentIndex += this.state.animationSpeed;
+                
+                if (this.state.currentIndex >= this.data.time.length) {
+                    this.state.currentIndex = 0;
+                }
+                
+                this.drawMainAnimation();
+                
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+                
+                this.state.animationId = requestAnimationFrame(() => this.animate());
+            },
+
+            startAnimation() {
+                if (!this.state.isPlaying && this.state.initialized) {
+                    this.state.isPlaying = true;
+                    document.getElementById('simple-startBtn').disabled = true;
+                    document.getElementById('simple-pauseBtn').disabled = false;
+                    this.animate();
+                }
+            },
+
+            pauseAnimation() {
+                this.state.isPlaying = false;
+                if (this.state.animationId) {
+                    cancelAnimationFrame(this.state.animationId);
+                }
+                document.getElementById('simple-startBtn').disabled = false;
+                document.getElementById('simple-pauseBtn').disabled = true;
+            },
+
+            resetAnimation() {
+                this.pauseAnimation();
+                this.state.currentIndex = 0;
+                this.calculatePhysics();
+                this.updateSystemInfo();
+                this.drawMainAnimation();
+                if (this.state.chartsVisible) {
+                    this.drawCurrentChart();
+                }
+            },
+
+            toggleCharts() {
+                this.state.chartsVisible = !this.state.chartsVisible;
+                const chartsContent = document.getElementById('simple-chartsContent');
+                const toggleBtn = document.getElementById('simple-toggleChartsBtn');
+                
+                if (this.state.chartsVisible) {
+                    chartsContent.classList.add('active');
+                    toggleBtn.textContent = '隐藏图表';
+                    
+                    setTimeout(() => {
+                        ['displacement', 'velocity', 'energy', 'phase'].forEach(id => {
+                            const canvas = document.getElementById('simple-' + id + 'Canvas');
+                            if (canvas) {
+                                this.setCanvasSize(canvas);
+                                if (!this.contexts[id]) {
+                                    this.contexts[id] = canvas.getContext('2d');
+                                }
+                            }
+                        });
+                        
+                        this.drawDisplacementChart();
+                        this.drawVelocityChart();
+                        this.drawEnergyChart();
+                        this.drawPhaseChart();
+                    }, 50);
+                } else {
+                    chartsContent.classList.remove('active');
+                    toggleBtn.textContent = '显示图表';
+                }
+            },
+
+            switchTab(tabName) {
+                document.querySelectorAll('#simple-chartsContent .tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.tab === tabName) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                document.querySelectorAll('#simple-chartsContent .chart-canvas').forEach(canvas => {
+                    canvas.classList.remove('active');
+                });
+                
+                const targetCanvas = document.getElementById('simple-' + tabName + 'Canvas');
+                if (targetCanvas) {
+                    targetCanvas.classList.add('active');
+                    
+                    switch(tabName) {
+                        case 'displacement':
+                            this.drawDisplacementChart();
+                            break;
+                        case 'velocity':
+                            this.drawVelocityChart();
+                            break;
+                        case 'energy':
+                            this.drawEnergyChart();
+                            break;
+                        case 'phase':
+                            this.drawPhaseChart();
+                            break;
+                    }
+                }
+            },
+
+            drawCurrentChart() {
+                if (!this.state.chartsVisible) return;
+                
+                const activeCanvas = document.querySelector('#simple-chartsContent .chart-canvas.active');
+                if (!activeCanvas) return;
+                
+                const canvasId = activeCanvas.id;
+                
+                if (canvasId.includes('displacement')) {
+                    this.drawDisplacementChart();
+                } else if (canvasId.includes('velocity')) {
+                    this.drawVelocityChart();
+                } else if (canvasId.includes('energy')) {
+                    this.drawEnergyChart();
+                } else if (canvasId.includes('phase')) {
+                    this.drawPhaseChart();
+                }
+            }
+        };
 
         // ============= 阻尼振动模拟器 =============
         const dampedSim = {
@@ -2015,12 +2730,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('振动系统综合模拟器加载中...');
             
+            simpleSim.init();
             dampedSim.init();
             forcedSim.init();
             
             // 窗口调整事件
             window.addEventListener('resize', () => {
-                if (currentSimulator === 'damped') {
+                if (currentSimulator === 'simple') {
+                    simpleSim.handleResize();
+                } else if (currentSimulator === 'damped') {
                     dampedSim.handleResize();
                 } else {
                     forcedSim.handleResize();
