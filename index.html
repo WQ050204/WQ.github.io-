@@ -908,27 +908,73 @@
                 this.mediaRecorder = null;
                 this.recordedChunks = [];
                 this.isRecording = false;
+                this.isMobile = this.checkMobile();
             }
 
-            // 创建单个视图的画布
+            // 检测是否为移动设备
+            checkMobile() {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            }
+
+            // 检测浏览器兼容性
+            checkCompatibility() {
+                // 检查 MediaRecorder API 支持
+                if (!window.MediaRecorder) {
+                    throw new Error('您的浏览器不支持视频录制功能，请使用Chrome、Firefox或Safari等现代浏览器');
+                }
+                
+                // 检查支持的编码格式
+                const types = [
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm',
+                    'video/mp4'
+                ];
+                
+                for (const type of types) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        return type;
+                    }
+                }
+                
+                throw new Error('您的浏览器不支持所需的视频格式');
+            }
+
+            // 创建单个视图的画布（移动端优化）
             createSingleViewCanvas(viewType) {
                 const exportCanvas = document.getElementById('export-canvas');
                 
-                // 根据视图类型设置画布尺寸
+                // 根据设备类型和视图类型设置画布尺寸
                 let width, height;
-                if (viewType === 'animation') {
-                    width = 1280;
-                    height = 720;
+                if (this.isMobile) {
+                    // 移动端使用较小分辨率以提高性能
+                    if (viewType === 'animation') {
+                        width = 854;
+                        height = 480;
+                    } else {
+                        width = 1280;
+                        height = 720;
+                    }
                 } else {
-                    width = 1920;
-                    height = 1080;
+                    // 桌面端保持高分辨率
+                    if (viewType === 'animation') {
+                        width = 1280;
+                        height = 720;
+                    } else {
+                        width = 1920;
+                        height = 1080;
+                    }
                 }
                 
                 exportCanvas.width = width;
                 exportCanvas.height = height;
                 
                 this.exportCanvas = exportCanvas;
-                this.exportCtx = exportCanvas.getContext('2d');
+                this.exportCtx = exportCanvas.getContext('2d', {
+                    // 优化性能的设置
+                    alpha: false,
+                    desynchronized: true
+                });
                 
                 // 设置白色背景
                 this.exportCtx.fillStyle = 'white';
@@ -937,7 +983,7 @@
                 return exportCanvas;
             }
 
-            // 导出所有视频
+            // 导出所有视频（移动端优化）
             async exportAllVideos(sim) {
                 const videos = ['animation', 'displacement', 'velocity', 'energy'];
                 if (this.simulatorType === 'simple') {
@@ -946,56 +992,197 @@
                     videos.push('resonance');
                 }
                 
+                // 移动端逐个导出，避免内存溢出
                 for (const videoType of videos) {
                     await this.exportSingleVideo(sim, videoType);
-                    // 等待一下，避免过快
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // 等待更长时间，让移动设备有时间处理
+                    await new Promise(resolve => setTimeout(resolve, this.isMobile ? 1000 : 500));
+                    
+                    // 移动端清理内存
+                    if (this.isMobile && typeof window.gc === 'function') {
+                        window.gc();
+                    }
                 }
             }
 
-            // 导出单个视频
+            // 导出单个视频（移动端优化）
             async exportSingleVideo(sim, viewType) {
-                // 创建对应视图的画布
-                this.createSingleViewCanvas(viewType);
-                
-                // 计算录制时长
-                const recordingDuration = this.calculateRecordingDuration(sim, viewType);
-                
-                // 开始录制
-                await this.startRecording(sim);
-                
-                // 录制帧
-                const fps = 30;
-                const totalFrames = Math.ceil(recordingDuration * fps);
-                
-                for (let frameNum = 0; frameNum < totalFrames; frameNum++) {
-                    const progress = frameNum / totalFrames;
-                    const currentDataTime = progress * recordingDuration;
-                    const dataIndex = Math.floor(currentDataTime / 0.05);
+                try {
+                    // 检查兼容性
+                    const mimeType = this.checkCompatibility();
                     
-                    if (dataIndex < sim.data.time.length) {
-                        this.drawSingleViewFrame(sim, viewType, dataIndex);
+                    // 创建对应视图的画布
+                    this.createSingleViewCanvas(viewType);
+                    
+                    // 计算录制时长（移动端缩短）
+                    const recordingDuration = this.calculateRecordingDuration(sim, viewType);
+                    
+                    // 开始录制
+                    await this.startRecording(sim, mimeType);
+                    
+                    // 录制帧（移动端降低帧率）
+                    const fps = this.isMobile ? 15 : 30;
+                    const totalFrames = Math.ceil(recordingDuration * fps);
+                    
+                    for (let frameNum = 0; frameNum < totalFrames; frameNum++) {
+                        const progress = frameNum / totalFrames;
+                        const currentDataTime = progress * recordingDuration;
+                        const dataIndex = Math.floor(currentDataTime / 0.05);
+                        
+                        if (dataIndex < sim.data.time.length) {
+                            this.drawSingleViewFrame(sim, viewType, dataIndex);
+                        }
+                        
+                        await new Promise(resolve => setTimeout(resolve, 1000 / fps));
+                        
+                        // 移动端定期让出控制权
+                        if (this.isMobile && frameNum % 30 === 0) {
+                            await new Promise(resolve => setTimeout(resolve, 10));
+                        }
                     }
                     
-                    await new Promise(resolve => setTimeout(resolve, 1000 / fps));
+                    // 停止录制并保存
+                    this.stopRecording();
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    this.saveVideo(sim, viewType);
+                    
+                } catch (error) {
+                    // 清理资源
+                    this.stopRecording();
+                    throw error;
                 }
-                
-                // 停止录制并保存
-                this.stopRecording();
-                await new Promise(resolve => setTimeout(resolve, 100));
-                this.saveVideo(sim, viewType);
             }
 
-            // 计算录制时长
+            // 计算录制时长（移动端优化）
             calculateRecordingDuration(sim, viewType) {
                 if (viewType === 'phase' || viewType === 'resonance') {
                     // 相位图和共振曲线录制较短时间
-                    return 5;
+                    return this.isMobile ? 3 : 5;
                 }
                 
-                // 其他视图录制完整数据或最多20秒
+                // 其他视图录制完整数据或最多时间（移动端缩短）
                 const totalDataTime = sim.data.time[sim.data.time.length - 1];
-                return Math.min(totalDataTime, 20);
+                const maxDuration = this.isMobile ? 10 : 20;
+                return Math.min(totalDataTime, maxDuration);
+            }
+
+            // 开始录制（改进的兼容性）
+            async startRecording(sim, mimeType) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        // 创建流
+                        const stream = this.exportCanvas.captureStream(this.isMobile ? 15 : 30);
+                        
+                        // 配置选项（移动端优化）
+                        const options = {
+                            mimeType: mimeType
+                        };
+                        
+                        // 根据设备调整比特率
+                        if (mimeType.includes('webm')) {
+                            options.videoBitsPerSecond = this.isMobile ? 2000000 : 8000000; // 移动端2Mbps，桌面端8Mbps
+                        }
+                        
+                        // 创建媒体录制器
+                        this.mediaRecorder = new MediaRecorder(stream, options);
+                        
+                        this.recordedChunks = [];
+                        
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            if (event.data && event.data.size > 0) {
+                                this.recordedChunks.push(event.data);
+                            }
+                        };
+                        
+                        this.mediaRecorder.onerror = (error) => {
+                            console.error('录制错误:', error);
+                            reject(error);
+                        };
+                        
+                        this.mediaRecorder.onstop = () => {
+                            // 停止时的处理在外部进行
+                        };
+                        
+                        // 开始录制（移动端使用时间片以减少内存使用）
+                        if (this.isMobile) {
+                            this.mediaRecorder.start(1000); // 每秒生成一个数据块
+                        } else {
+                            this.mediaRecorder.start();
+                        }
+                        
+                        this.isRecording = true;
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            // 保存视频（改进的兼容性）
+            saveVideo(sim, viewType) {
+                try {
+                    const blob = new Blob(this.recordedChunks, { 
+                        type: this.recordedChunks.length > 0 ? this.recordedChunks[0].type : 'video/webm' 
+                    });
+                    
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    let fileName = 'oscillation_';
+                    if (this.simulatorType === 'simple') {
+                        fileName += 'simple_';
+                    } else if (this.simulatorType === 'damped') {
+                        fileName += 'damped_';
+                    } else {
+                        fileName += 'forced_';
+                    }
+                    
+                    // 添加视图类型
+                    fileName += viewType + '_';
+                    
+                    const date = new Date();
+                    fileName += `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
+                    fileName += `_${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}${String(date.getSeconds()).padStart(2,'0')}`;
+                    
+                    // 根据实际类型设置文件扩展名
+                    const extension = blob.type.includes('mp4') ? '.mp4' : '.webm';
+                    fileName += extension;
+                    
+                    a.download = fileName;
+                    
+                    // 移动端特殊处理
+                    if (this.isMobile) {
+                        // iOS设备需要特殊处理
+                        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                            // 尝试直接打开视频
+                            window.open(url, '_blank');
+                        } else {
+                            // Android和其他设备
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                        }
+                    } else {
+                        // 桌面端标准下载
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
+                    
+                    // 延迟清理URL，确保下载完成
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                    }, 5000);
+                    
+                    // 清理内存
+                    this.recordedChunks = [];
+                    
+                } catch (error) {
+                    console.error('保存视频失败:', error);
+                    throw new Error('保存视频失败，请重试');
+                }
             }
 
             // 绘制单个视图的帧
@@ -2876,16 +3063,79 @@
                 const statusEl = document.getElementById('simple-exportStatus');
                 const exportBtn = document.getElementById('simple-exportBtn');
                 
-                // 创建导出选项菜单
+                // 检测是否为移动设备
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // 创建导出选项菜单（移动端优化）
                 const options = `
-                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
-                    <button onclick="simpleSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
-                    <button onclick="simpleSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
-                    <button onclick="simpleSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
-                    <button onclick="simpleSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
-                    <button onclick="simpleSim.exportSpecificVideo('phase')" style="margin: 2px; padding: 8px;">相位图</button>
-                    <button onclick="simpleSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
-                    <button onclick="simpleSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                    <div style="margin-bottom: 10px; font-weight: bold; font-size: ${isMobile ? '14px' : '16px'};">选择要导出的视频：</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        <button onclick="simpleSim.exportSpecificVideo('animation')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">主动画</button>
+                        <button onclick="simpleSim.exportSpecificVideo('displacement')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">位移图</button>
+                        <button onclick="simpleSim.exportSpecificVideo('velocity')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">速度图</button>
+                        <button onclick="simpleSim.exportSpecificVideo('energy')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">能量图</button>
+                        <button onclick="simpleSim.exportSpecificVideo('phase')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">相位图</button>
+                        <button onclick="simpleSim.exportSpecificVideo('all')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #27ae60; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">导出全部</button>
+                        <button onclick="simpleSim.cancelExport()" 
+                            style="flex: ${isMobile ? '1 1 100%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #e74c3c; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">取消</button>
+                    </div>
                 `;
                 
                 statusEl.innerHTML = options;
@@ -3529,15 +3779,70 @@
                 const statusEl = document.getElementById('damped-exportStatus');
                 const exportBtn = document.getElementById('damped-exportBtn');
                 
-                // 创建导出选项菜单
+                // 检测是否为移动设备
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // 创建导出选项菜单（移动端优化）
                 const options = `
-                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
-                    <button onclick="dampedSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
-                    <button onclick="dampedSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
-                    <button onclick="dampedSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
-                    <button onclick="dampedSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
-                    <button onclick="dampedSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
-                    <button onclick="dampedSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                    <div style="margin-bottom: 10px; font-weight: bold; font-size: ${isMobile ? '14px' : '16px'};">选择要导出的视频：</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        <button onclick="dampedSim.exportSpecificVideo('animation')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">主动画</button>
+                        <button onclick="dampedSim.exportSpecificVideo('displacement')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">位移图</button>
+                        <button onclick="dampedSim.exportSpecificVideo('velocity')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">速度图</button>
+                        <button onclick="dampedSim.exportSpecificVideo('energy')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">能量图</button>
+                        <button onclick="dampedSim.exportSpecificVideo('all')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #27ae60; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">导出全部</button>
+                        <button onclick="dampedSim.cancelExport()" 
+                            style="flex: ${isMobile ? '1 1 100%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #e74c3c; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">取消</button>
+                    </div>
                 `;
                 
                 statusEl.innerHTML = options;
@@ -4330,16 +4635,79 @@
                 const statusEl = document.getElementById('forced-exportStatus');
                 const exportBtn = document.getElementById('forced-exportBtn');
                 
-                // 创建导出选项菜单
+                // 检测是否为移动设备
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // 创建导出选项菜单（移动端优化）
                 const options = `
-                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
-                    <button onclick="forcedSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
-                    <button onclick="forcedSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
-                    <button onclick="forcedSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
-                    <button onclick="forcedSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
-                    <button onclick="forcedSim.exportSpecificVideo('resonance')" style="margin: 2px; padding: 8px;">共振曲线</button>
-                    <button onclick="forcedSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
-                    <button onclick="forcedSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                    <div style="margin-bottom: 10px; font-weight: bold; font-size: ${isMobile ? '14px' : '16px'};">选择要导出的视频：</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        <button onclick="forcedSim.exportSpecificVideo('animation')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">主动画</button>
+                        <button onclick="forcedSim.exportSpecificVideo('displacement')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">位移图</button>
+                        <button onclick="forcedSim.exportSpecificVideo('velocity')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">速度图</button>
+                        <button onclick="forcedSim.exportSpecificVideo('energy')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">能量图</button>
+                        <button onclick="forcedSim.exportSpecificVideo('resonance')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   border: 1px solid #ddd; 
+                                   border-radius: 5px; 
+                                   background: white; 
+                                   cursor: pointer;">共振曲线</button>
+                        <button onclick="forcedSim.exportSpecificVideo('all')" 
+                            style="flex: ${isMobile ? '1 1 45%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #27ae60; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">导出全部</button>
+                        <button onclick="forcedSim.cancelExport()" 
+                            style="flex: ${isMobile ? '1 1 100%' : '1'}; 
+                                   margin: 2px; 
+                                   padding: ${isMobile ? '12px 8px' : '8px'}; 
+                                   font-size: ${isMobile ? '13px' : '14px'}; 
+                                   background: #e74c3c; 
+                                   color: white; 
+                                   border: none; 
+                                   border-radius: 5px; 
+                                   cursor: pointer;">取消</button>
+                    </div>
                 `;
                 
                 statusEl.innerHTML = options;
