@@ -168,10 +168,12 @@
             display: flex;
             gap: 10px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
 
         .control-button {
             flex: 1;
+            min-width: 100px;
             padding: 12px;
             border: none;
             border-radius: 10px;
@@ -197,6 +199,11 @@
             color: white;
         }
 
+        .export-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
         .control-button:active {
             transform: scale(0.95);
         }
@@ -204,6 +211,37 @@
         .control-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .export-status {
+            display: none;
+            background: #e8f4f8;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .export-status.active {
+            display: block;
+        }
+
+        .export-status.recording {
+            background: #ffe8e8;
+            color: #d32f2f;
+            font-weight: 600;
+        }
+
+        .export-status.processing {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .export-status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
         }
 
         .info-section {
@@ -384,6 +422,14 @@
             border-bottom-color: white;
         }
 
+        /* 隐藏的组合画布用于导出 */
+        #export-canvas {
+            position: fixed;
+            top: -9999px;
+            left: -9999px;
+            background: white;
+        }
+
         @media (min-width: 768px) {
             .container {
                 max-width: 768px;
@@ -503,7 +549,11 @@
                     <button class="control-button start-btn" id="simple-startBtn">▶ 开始</button>
                     <button class="control-button pause-btn" id="simple-pauseBtn">⏸ 暂停</button>
                     <button class="control-button reset-btn" id="simple-resetBtn">↺ 重置</button>
+                    <button class="control-button export-btn" id="simple-exportBtn">📹 导出视频</button>
                 </div>
+
+                <!-- 导出状态提示 -->
+                <div class="export-status" id="simple-exportStatus"></div>
 
                 <!-- 系统信息 -->
                 <div class="info-section">
@@ -623,7 +673,11 @@
                     <button class="control-button start-btn" id="damped-startBtn">▶ 开始</button>
                     <button class="control-button pause-btn" id="damped-pauseBtn">⏸ 暂停</button>
                     <button class="control-button reset-btn" id="damped-resetBtn">↺ 重置</button>
+                    <button class="control-button export-btn" id="damped-exportBtn">📹 导出视频</button>
                 </div>
+
+                <!-- 导出状态提示 -->
+                <div class="export-status" id="damped-exportStatus"></div>
 
                 <!-- 系统信息 -->
                 <div class="info-section">
@@ -759,7 +813,11 @@
                     <button class="control-button start-btn" id="forced-startBtn">▶ 开始</button>
                     <button class="control-button pause-btn" id="forced-pauseBtn">⏸ 暂停</button>
                     <button class="control-button reset-btn" id="forced-resetBtn">↺ 重置</button>
+                    <button class="control-button export-btn" id="forced-exportBtn">📹 导出视频</button>
                 </div>
+
+                <!-- 导出状态提示 -->
+                <div class="export-status" id="forced-exportStatus"></div>
 
                 <!-- 系统信息 -->
                 <div class="info-section">
@@ -830,6 +888,9 @@
         </div>
     </div>
 
+    <!-- 隐藏的导出画布 -->
+    <canvas id="export-canvas"></canvas>
+
     <script>
         // ============================================
         // 振动系统综合模拟器 - 完整JavaScript代码
@@ -837,6 +898,1340 @@
         
         // 当前活动的模拟器
         let currentSimulator = 'simple';
+
+        // 视频导出工具类
+        class VideoExporter {
+            constructor(simulatorType) {
+                this.simulatorType = simulatorType;
+                this.exportCanvas = null;
+                this.exportCtx = null;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.isRecording = false;
+            }
+
+            // 创建单个视图的画布
+            createSingleViewCanvas(viewType) {
+                const exportCanvas = document.getElementById('export-canvas');
+                
+                // 根据视图类型设置画布尺寸
+                let width, height;
+                if (viewType === 'animation') {
+                    width = 1280;
+                    height = 720;
+                } else {
+                    width = 1920;
+                    height = 1080;
+                }
+                
+                exportCanvas.width = width;
+                exportCanvas.height = height;
+                
+                this.exportCanvas = exportCanvas;
+                this.exportCtx = exportCanvas.getContext('2d');
+                
+                // 设置白色背景
+                this.exportCtx.fillStyle = 'white';
+                this.exportCtx.fillRect(0, 0, width, height);
+                
+                return exportCanvas;
+            }
+
+            // 导出所有视频
+            async exportAllVideos(sim) {
+                const videos = ['animation', 'displacement', 'velocity', 'energy'];
+                if (this.simulatorType === 'simple') {
+                    videos.push('phase');
+                } else if (this.simulatorType === 'forced') {
+                    videos.push('resonance');
+                }
+                
+                for (const videoType of videos) {
+                    await this.exportSingleVideo(sim, videoType);
+                    // 等待一下，避免过快
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+
+            // 导出单个视频
+            async exportSingleVideo(sim, viewType) {
+                // 创建对应视图的画布
+                this.createSingleViewCanvas(viewType);
+                
+                // 计算录制时长
+                const recordingDuration = this.calculateRecordingDuration(sim, viewType);
+                
+                // 开始录制
+                await this.startRecording(sim);
+                
+                // 录制帧
+                const fps = 30;
+                const totalFrames = Math.ceil(recordingDuration * fps);
+                
+                for (let frameNum = 0; frameNum < totalFrames; frameNum++) {
+                    const progress = frameNum / totalFrames;
+                    const currentDataTime = progress * recordingDuration;
+                    const dataIndex = Math.floor(currentDataTime / 0.05);
+                    
+                    if (dataIndex < sim.data.time.length) {
+                        this.drawSingleViewFrame(sim, viewType, dataIndex);
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 1000 / fps));
+                }
+                
+                // 停止录制并保存
+                this.stopRecording();
+                await new Promise(resolve => setTimeout(resolve, 100));
+                this.saveVideo(sim, viewType);
+            }
+
+            // 计算录制时长
+            calculateRecordingDuration(sim, viewType) {
+                if (viewType === 'phase' || viewType === 'resonance') {
+                    // 相位图和共振曲线录制较短时间
+                    return 5;
+                }
+                
+                // 其他视图录制完整数据或最多20秒
+                const totalDataTime = sim.data.time[sim.data.time.length - 1];
+                return Math.min(totalDataTime, 20);
+            }
+
+            // 绘制单个视图的帧
+            drawSingleViewFrame(sim, viewType, frameIndex) {
+                const ctx = this.exportCtx;
+                const width = this.exportCanvas.width;
+                const height = this.exportCanvas.height;
+                
+                // 清除画布
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 标题
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                
+                let title = '';
+                if (this.simulatorType === 'simple') {
+                    title = '简谐振动 - ';
+                } else if (this.simulatorType === 'damped') {
+                    title = '阻尼振动 - ';
+                } else {
+                    title = '受迫振动 - ';
+                }
+                
+                switch(viewType) {
+                    case 'animation':
+                        title += '系统动画';
+                        break;
+                    case 'displacement':
+                        title += '位移-时间图';
+                        break;
+                    case 'velocity':
+                        title += '速度-时间图';
+                        break;
+                    case 'energy':
+                        title += '能量-时间图';
+                        break;
+                    case 'phase':
+                        title += '相位图';
+                        break;
+                    case 'resonance':
+                        title += '共振曲线';
+                        break;
+                }
+                
+                ctx.fillText(title, width / 2, 60);
+                
+                // 时间信息
+                const currentTime = sim.data.time[frameIndex] || 0;
+                ctx.font = '24px Arial';
+                ctx.fillText(`t = ${currentTime.toFixed(2)} s`, width / 2, 100);
+                
+                // 根据视图类型绘制内容
+                if (viewType === 'animation') {
+                    // 主动画
+                    this.drawMainAnimationFrame(sim, frameIndex, 50, 140, width - 100, height - 240);
+                    
+                    // 参数信息
+                    this.drawParameterInfo(sim, frameIndex, 50, height - 80, width - 100, 60);
+                } else {
+                    // 图表视图
+                    const chartX = 80;
+                    const chartY = 140;
+                    const chartWidth = width - 160;
+                    const chartHeight = height - 280;
+                    
+                    ctx.strokeStyle = '#ddd';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(chartX, chartY, chartWidth, chartHeight);
+                    
+                    if (viewType === 'phase' || viewType === 'resonance') {
+                        // 静态图表
+                        this.drawStaticChart(sim, viewType, frameIndex, chartX, chartY, chartWidth, chartHeight);
+                    } else {
+                        // 滚动图表
+                        this.drawScrollingChartFull(sim, viewType, frameIndex, chartX, chartY, chartWidth, chartHeight);
+                    }
+                    
+                    // 参数信息
+                    this.drawParameterInfo(sim, frameIndex, 50, height - 80, width - 100, 60);
+                }
+            }
+
+            // 绘制完整的滚动图表（用于单独导出）
+            drawScrollingChartFull(sim, chartType, currentIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(60, height - 60);
+                ctx.lineTo(width - 40, height - 60);
+                ctx.moveTo(60, height - 60);
+                ctx.lineTo(60, 40);
+                ctx.stroke();
+                
+                // 坐标轴标签
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText('时间 (s)', width / 2, height - 20);
+                
+                ctx.save();
+                ctx.translate(25, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                
+                if (chartType === 'displacement') {
+                    ctx.fillText('位移 (m)', 0, 0);
+                } else if (chartType === 'velocity') {
+                    ctx.fillText('速度 (m/s)', 0, 0);
+                } else if (chartType === 'energy') {
+                    ctx.fillText('能量 (J)', 0, 0);
+                }
+                ctx.restore();
+                
+                // 绘制数据
+                const plotX = 60;
+                const plotY = 40;
+                const plotWidth = width - 100;
+                const plotHeight = height - 100;
+                
+                // 重要：只绘制到当前索引，不绘制未来的数据
+                const dataEndIndex = Math.min(currentIndex + 1, sim.data.time.length);
+                
+                if (chartType === 'displacement') {
+                    // 位移曲线 - 只绘制到当前时刻
+                    this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                           sim.data.position.slice(0, dataEndIndex),
+                                           '#3498db', currentIndex,
+                                           plotX, plotY, plotWidth, plotHeight, 3);
+                    
+                    // 如果是受迫振动，绘制外力
+                    if (this.simulatorType === 'forced') {
+                        const scaledForce = sim.data.force.slice(0, dataEndIndex).map(f => f * 0.3);
+                        this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                               scaledForce, '#27ae60', -1,
+                                               plotX, plotY, plotWidth, plotHeight, 2);
+                        
+                        // 图例
+                        ctx.font = '16px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillStyle = '#3498db';
+                        ctx.fillRect(width - 180, 60, 20, 20);
+                        ctx.fillStyle = '#333';
+                        ctx.fillText('位移', width - 150, 77);
+                        
+                        ctx.fillStyle = '#27ae60';
+                        ctx.fillRect(width - 180, 90, 20, 20);
+                        ctx.fillStyle = '#333';
+                        ctx.fillText('外力×0.3', width - 150, 107);
+                    }
+                    
+                } else if (chartType === 'velocity') {
+                    // 速度曲线 - 只绘制到当前时刻
+                    this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                           sim.data.velocity.slice(0, dataEndIndex),
+                                           '#e74c3c', currentIndex,
+                                           plotX, plotY, plotWidth, plotHeight, 3);
+                    
+                } else if (chartType === 'energy') {
+                    // 能量曲线 - 只绘制到当前时刻
+                    this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                           sim.data.kineticEnergy.slice(0, dataEndIndex),
+                                           '#e74c3c', -1,
+                                           plotX, plotY, plotWidth, plotHeight, 2);
+                    
+                    this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                           sim.data.potentialEnergy.slice(0, dataEndIndex),
+                                           '#3498db', -1,
+                                           plotX, plotY, plotWidth, plotHeight, 2);
+                    
+                    this.drawProgressiveLine(sim.data.time.slice(0, dataEndIndex),
+                                           sim.data.totalEnergy.slice(0, dataEndIndex),
+                                           '#2c3e50', -1,
+                                           plotX, plotY, plotWidth, plotHeight, 2);
+                    
+                    // 图例
+                    ctx.font = '16px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.fillRect(width - 150, 60, 20, 20);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('动能', width - 120, 77);
+                    
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillRect(width - 150, 90, 20, 20);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('势能', width - 120, 107);
+                    
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillRect(width - 150, 120, 20, 20);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('总能量', width - 120, 137);
+                }
+                
+                ctx.restore();
+            }
+
+            // 绘制渐进式线条（模拟主界面的逐步绘制效果）
+            drawProgressiveLine(xData, yData, color, markerIndex, x, y, width, height, lineWidth = 2) {
+                const ctx = this.exportCtx;
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                // 计算数据范围（使用完整数据范围以保持比例一致）
+                const xMin = 0;
+                const xMax = 20; // 使用固定的时间范围
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                // 绘制已有的线条
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const px = x + (xData[i] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[i] - yMin) / (yMax - yMin) * height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 在最后一个点处绘制标记
+                if (markerIndex >= 0 && markerIndex < xData.length) {
+                    const lastIndex = xData.length - 1;
+                    const px = x + (xData[lastIndex] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[lastIndex] - yMin) / (yMax - yMin) * height;
+                    
+                    ctx.fillStyle = '#ff6b35';
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // 绘制静态图表（相位图和共振曲线）
+            drawStaticChart(sim, chartType, currentIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                if (chartType === 'phase') {
+                    // 相位图
+                    this.drawPhaseChart(sim, currentIndex, width, height);
+                } else if (chartType === 'resonance') {
+                    // 共振曲线
+                    this.drawResonanceChart(sim, width, height);
+                }
+                
+                ctx.restore();
+            }
+
+            // 绘制相位图
+            drawPhaseChart(sim, currentIndex, width, height) {
+                const ctx = this.exportCtx;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(width / 2, 40);
+                ctx.lineTo(width / 2, height - 40);
+                ctx.moveTo(60, height / 2);
+                ctx.lineTo(width - 60, height / 2);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '18px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('位移 (m)', width - 100, height / 2 - 15);
+                ctx.save();
+                ctx.translate(width / 2 + 20, 60);
+                ctx.fillText('速度 (m/s)', 0, 0);
+                ctx.restore();
+                
+                // 绘制相位轨迹
+                const xMin = Math.min(...sim.data.position);
+                const xMax = Math.max(...sim.data.position);
+                const vMin = Math.min(...sim.data.velocity);
+                const vMax = Math.max(...sim.data.velocity);
+                
+                const scale = 0.8;
+                
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                for (let i = 0; i <= currentIndex && i < sim.data.position.length; i++) {
+                    const px = width / 2 + (sim.data.position[i] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width * scale / 2 - 80);
+                    const py = height / 2 - (sim.data.velocity[i] / Math.max(Math.abs(vMin), Math.abs(vMax))) * (height * scale / 2 - 80);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前点
+                if (currentIndex < sim.data.position.length) {
+                    const px = width / 2 + (sim.data.position[currentIndex] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width * scale / 2 - 80);
+                    const py = height / 2 - (sim.data.velocity[currentIndex] / Math.max(Math.abs(vMin), Math.abs(vMax))) * (height * scale / 2 - 80);
+                    
+                    ctx.fillStyle = '#ff6b35';
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            // 绘制共振曲线
+            drawResonanceChart(sim, width, height) {
+                const ctx = this.exportCtx;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(60, height - 60);
+                ctx.lineTo(width - 40, height - 60);
+                ctx.moveTo(60, height - 60);
+                ctx.lineTo(60, 40);
+                ctx.stroke();
+                
+                // 标签
+                ctx.fillStyle = '#333';
+                ctx.font = '18px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('频率比 (ω/ωn)', width / 2, height - 20);
+                
+                ctx.save();
+                ctx.translate(25, height / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText('振幅 (m)', 0, 0);
+                ctx.restore();
+                
+                // 绘制共振曲线
+                const omega_n = Math.sqrt(sim.params.springConstant / sim.params.mass);
+                const frequencyRatios = sim.resonanceData.frequencies.map(f => f / omega_n);
+                
+                const xMin = Math.min(...frequencyRatios);
+                const xMax = Math.max(...frequencyRatios);
+                const yMin = Math.min(...sim.resonanceData.amplitudes);
+                const yMax = Math.max(...sim.resonanceData.amplitudes);
+                
+                ctx.strokeStyle = '#e74c3c';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                for (let i = 0; i < frequencyRatios.length; i++) {
+                    const px = 60 + (frequencyRatios[i] - xMin) / (xMax - xMin) * (width - 100);
+                    const py = height - 60 - (sim.resonanceData.amplitudes[i] - yMin) / (yMax - yMin) * (height - 100);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前工作点
+                const currentRatio = sim.params.forceFrequency / omega_n;
+                const denominator = Math.sqrt(Math.pow(sim.params.springConstant - sim.params.mass * sim.params.forceFrequency * sim.params.forceFrequency, 2) + 
+                                             Math.pow(sim.params.dampingCoefficient * sim.params.forceFrequency, 2));
+                const currentAmplitude = sim.params.forceAmplitude / denominator;
+                
+                const px = 60 + (currentRatio - xMin) / (xMax - xMin) * (width - 100);
+                const py = height - 60 - (currentAmplitude - yMin) / (yMax - yMin) * (height - 100);
+                
+                ctx.fillStyle = '#27ae60';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                // 共振频率线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                ctx.beginPath();
+                const resonanceX = 60 + (1 - xMin) / (xMax - xMin) * (width - 100);
+                ctx.moveTo(resonanceX, 40);
+                ctx.lineTo(resonanceX, height - 60);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 图例
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(width - 180, 60, 20, 20);
+                ctx.fillStyle = '#333';
+                ctx.fillText('当前工作点', width - 150, 77);
+            }
+
+            // 绘制线条（改进版）
+            drawLine(xData, yData, color, xMin, xMax, markerIndex, x, y, width, height, lineWidth = 2) {
+                const ctx = this.exportCtx;
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const px = x + (xData[i] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[i] - yMin) / (yMax - yMin) * height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // 绘制组合帧
+            drawCompositeFrame(sim, frameIndex) {
+                const ctx = this.exportCtx;
+                const width = this.exportCanvas.width;
+                const height = this.exportCanvas.height;
+                
+                // 清除画布
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 标题区域
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                let title = '';
+                if (this.simulatorType === 'simple') {
+                    title = '简谐振动 Simple Harmonic Motion';
+                } else if (this.simulatorType === 'damped') {
+                    title = '阻尼振动 Damped Oscillation';
+                } else {
+                    title = '受迫振动 Forced Oscillation';
+                }
+                ctx.fillText(title, width / 2, 50);
+                
+                // 时间信息
+                const currentTime = sim.data.time[frameIndex] || 0;
+                ctx.font = '24px Arial';
+                ctx.fillText(`t = ${currentTime.toFixed(2)} s`, width / 2, 90);
+                
+                // 主动画区域（左上）
+                const animWidth = 640;
+                const animHeight = 480;
+                const animX = 50;
+                const animY = 120;
+                
+                // 绘制主动画边框
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(animX, animY, animWidth, animHeight);
+                
+                // 绘制主动画
+                this.drawMainAnimationFrame(sim, frameIndex, animX, animY, animWidth, animHeight);
+                
+                // 图表区域（右侧和下方）
+                const chartWidth = 560;
+                const chartHeight = 230;
+                const chartStartX = animX + animWidth + 50;
+                const chartStartY = animY;
+                const chartGap = 20;
+                
+                // 位移图表
+                ctx.strokeRect(chartStartX, chartStartY, chartWidth, chartHeight);
+                this.drawChartFrame(sim, 'displacement', frameIndex, chartStartX, chartStartY, chartWidth, chartHeight);
+                
+                // 速度图表
+                const chart2Y = chartStartY + chartHeight + chartGap;
+                ctx.strokeRect(chartStartX, chart2Y, chartWidth, chartHeight);
+                this.drawChartFrame(sim, 'velocity', frameIndex, chartStartX, chart2Y, chartWidth, chartHeight);
+                
+                // 能量图表
+                const chart3X = animX;
+                const chart3Y = animY + animHeight + chartGap;
+                const chart3Width = 640;
+                ctx.strokeRect(chart3X, chart3Y, chart3Width, chartHeight);
+                this.drawChartFrame(sim, 'energy', frameIndex, chart3X, chart3Y, chart3Width, chartHeight);
+                
+                // 特殊图表（相位图或共振曲线）
+                if (this.simulatorType === 'simple') {
+                    const chart4X = chart3X + chart3Width + 50;
+                    ctx.strokeRect(chart4X, chart3Y, chartWidth, chartHeight);
+                    this.drawChartFrame(sim, 'phase', frameIndex, chart4X, chart3Y, chartWidth, chartHeight);
+                } else if (this.simulatorType === 'forced') {
+                    const chart4X = chart3X + chart3Width + 50;
+                    ctx.strokeRect(chart4X, chart3Y, chartWidth, chartHeight);
+                    this.drawChartFrame(sim, 'resonance', frameIndex, chart4X, chart3Y, chartWidth, chartHeight);
+                }
+                
+                // 参数信息（底部）
+                this.drawParameterInfo(sim, frameIndex, 50, height - 100, width - 100, 80);
+            }
+
+            // 绘制主动画帧
+            drawMainAnimationFrame(sim, frameIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = Math.min(width, height) / 12;
+                
+                const currentPosition = sim.data.position[frameIndex] || 0;
+                const currentVelocity = sim.data.velocity[frameIndex] || 0;
+                
+                // 支撑点
+                ctx.fillStyle = '#333';
+                ctx.fillRect(centerX - 40, 20, 80, 10);
+                
+                // 弹簧
+                ctx.strokeStyle = '#4a90e2';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const springTop = 30;
+                const springBottom = centerY + currentPosition * scale;
+                const coils = 12;
+                const coilHeight = (springBottom - springTop) / coils;
+                
+                ctx.moveTo(centerX, springTop);
+                for (let i = 0; i < coils; i++) {
+                    const yPos = springTop + i * coilHeight;
+                    const nextY = springTop + (i + 1) * coilHeight;
+                    const midY = (yPos + nextY) / 2;
+                    
+                    if (i % 2 === 0) {
+                        ctx.quadraticCurveTo(centerX + 20, midY, centerX, nextY);
+                    } else {
+                        ctx.quadraticCurveTo(centerX - 20, midY, centerX, nextY);
+                    }
+                }
+                ctx.stroke();
+                
+                // 质量块
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(centerX - 30, springBottom - 30, 60, 60);
+                
+                // 参考线
+                ctx.strokeStyle = '#95a5a6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 如果是受迫振动，绘制外力
+                if (this.simulatorType === 'forced' && sim.data.force) {
+                    const currentForce = sim.data.force[frameIndex] || 0;
+                    const forceScale = 15;
+                    const forceLength = currentForce * forceScale;
+                    const forceX = centerX;
+                    const forceBaseY = springBottom;
+                    
+                    ctx.strokeStyle = '#27ae60';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(forceX, forceBaseY);
+                    ctx.lineTo(forceX, forceBaseY + forceLength);
+                    ctx.stroke();
+                    
+                    if (Math.abs(forceLength) > 5) {
+                        ctx.beginPath();
+                        const arrowDir = forceLength > 0 ? 1 : -1;
+                        ctx.moveTo(forceX, forceBaseY + forceLength);
+                        ctx.lineTo(forceX - 5, forceBaseY + forceLength - 10 * arrowDir);
+                        ctx.lineTo(forceX + 5, forceBaseY + forceLength - 10 * arrowDir);
+                        ctx.closePath();
+                        ctx.fillStyle = '#27ae60';
+                        ctx.fill();
+                    }
+                    
+                    ctx.fillStyle = '#27ae60';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText('F', forceX + 15, forceBaseY + forceLength / 2);
+                }
+                
+                // 当前值
+                ctx.fillStyle = '#333';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`位置: ${currentPosition.toFixed(3)} m`, 10, height - 40);
+                ctx.fillText(`速度: ${currentVelocity.toFixed(3)} m/s`, 10, height - 20);
+                
+                ctx.restore();
+            }
+
+            // 绘制图表帧
+            drawChartFrame(sim, chartType, frameIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(width - 20, height - 30);
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(40, 20);
+                ctx.stroke();
+                
+                // 根据图表类型绘制
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                
+                if (chartType === 'displacement') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('位移 (m)', 0, 0);
+                    ctx.restore();
+                    
+                    this.drawLineOnChart(sim.data.time, sim.data.position, '#3498db', frameIndex, 40, 20, width - 60, height - 50);
+                } else if (chartType === 'velocity') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('速度 (m/s)', 0, 0);
+                    ctx.restore();
+                    
+                    this.drawLineOnChart(sim.data.time, sim.data.velocity, '#e74c3c', frameIndex, 40, 20, width - 60, height - 50);
+                } else if (chartType === 'energy') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('能量 (J)', 0, 0);
+                    ctx.restore();
+                    
+                    this.drawLineOnChart(sim.data.time, sim.data.kineticEnergy, '#e74c3c', frameIndex, 40, 20, width - 60, height - 50);
+                    this.drawLineOnChart(sim.data.time, sim.data.potentialEnergy, '#3498db', frameIndex, 40, 20, width - 60, height - 50);
+                    this.drawLineOnChart(sim.data.time, sim.data.totalEnergy, '#2c3e50', frameIndex, 40, 20, width - 60, height - 50);
+                    
+                    // 图例
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.fillRect(width - 80, 25, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('动能', width - 65, 33);
+                    
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillRect(width - 80, 40, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('势能', width - 65, 48);
+                    
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillRect(width - 80, 55, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('总能量', width - 65, 63);
+                } else if (chartType === 'phase') {
+                    ctx.fillText('位移 (m)', width - 30, height / 2 - 10);
+                    ctx.save();
+                    ctx.translate(width / 2 + 10, 35);
+                    ctx.fillText('速度 (m/s)', 0, 0);
+                    ctx.restore();
+                    
+                    this.drawPhaseOnChart(sim.data.position, sim.data.velocity, '#667eea', frameIndex, width, height);
+                } else if (chartType === 'resonance' && sim.resonanceData) {
+                    ctx.fillText('频率比 (ω/ωn)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('振幅 (m)', 0, 0);
+                    ctx.restore();
+                    
+                    const omega_n = Math.sqrt(sim.params.springConstant / sim.params.mass);
+                    const frequencyRatios = sim.resonanceData.frequencies.map(f => f / omega_n);
+                    this.drawLineOnChart(frequencyRatios, sim.resonanceData.amplitudes, '#e74c3c', -1, 40, 20, width - 60, height - 50);
+                    
+                    // 标记当前工作点
+                    const currentRatio = sim.params.forceFrequency / omega_n;
+                    const denominator = Math.sqrt(Math.pow(sim.params.springConstant - sim.params.mass * sim.params.forceFrequency * sim.params.forceFrequency, 2) + 
+                                                 Math.pow(sim.params.dampingCoefficient * sim.params.forceFrequency, 2));
+                    const currentAmplitude = sim.params.forceAmplitude / denominator;
+                    
+                    const xMin = Math.min(...frequencyRatios);
+                    const xMax = Math.max(...frequencyRatios);
+                    const yMin = Math.min(...sim.resonanceData.amplitudes);
+                    const yMax = Math.max(...sim.resonanceData.amplitudes);
+                    
+                    const px = 40 + (currentRatio - xMin) / (xMax - xMin) * (width - 60);
+                    const py = height - 30 - (currentAmplitude - yMin) / (yMax - yMin) * (height - 50);
+                    
+                    ctx.fillStyle = '#27ae60';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
+            // 绘制线条
+            drawLineOnChart(xData, yData, color, currentIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const xMin = Math.min(...xData);
+                const xMax = Math.max(...xData);
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const maxIndex = currentIndex >= 0 ? Math.min(currentIndex + 1, xData.length) : xData.length;
+                
+                for (let i = 0; i < maxIndex; i++) {
+                    const px = x + (xData[i] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[i] - yMin) / (yMax - yMin) * height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前点
+                if (currentIndex >= 0 && currentIndex < xData.length) {
+                    const px = x + (xData[currentIndex] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[currentIndex] - yMin) / (yMax - yMin) * height;
+                    
+                    ctx.fillStyle = '#e67e22';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+
+            // 绘制相位图
+            drawPhaseOnChart(xData, yData, color, currentIndex, width, height) {
+                const ctx = this.exportCtx;
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const xMin = Math.min(...xData);
+                const xMax = Math.max(...xData);
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(width / 2, 20);
+                ctx.lineTo(width / 2, height - 30);
+                ctx.moveTo(40, height / 2);
+                ctx.lineTo(width - 20, height / 2);
+                ctx.stroke();
+                
+                // 相位轨迹
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const maxIndex = currentIndex >= 0 ? Math.min(currentIndex + 1, xData.length) : xData.length;
+                
+                for (let i = 0; i < maxIndex; i++) {
+                    const px = width / 2 + (xData[i] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width / 2 - 40);
+                    const py = height / 2 - (yData[i] / Math.max(Math.abs(yMin), Math.abs(yMax))) * (height / 2 - 40);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前点
+                if (currentIndex >= 0 && currentIndex < xData.length) {
+                    const px = width / 2 + (xData[currentIndex] / Math.max(Math.abs(xMin), Math.abs(xMax))) * (width / 2 - 40);
+                    const py = height / 2 - (yData[currentIndex] / Math.max(Math.abs(yMin), Math.abs(yMax))) * (height / 2 - 40);
+                    
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+
+            // 绘制参数信息
+            drawParameterInfo(sim, frameIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 参数文本
+                ctx.fillStyle = '#333';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                
+                const params = sim.params;
+                let text = `参数: 质量 m = ${params.mass} kg, 弹簧常数 k = ${params.springConstant} N/m`;
+                
+                if (this.simulatorType === 'damped' || this.simulatorType === 'forced') {
+                    text += `, 阻尼系数 c = ${params.dampingCoefficient} Ns/m`;
+                }
+                
+                if (this.simulatorType === 'forced') {
+                    text += `, 外力幅值 F₀ = ${params.forceAmplitude} N, 外力频率 ω = ${params.forceFrequency} rad/s`;
+                }
+                
+                ctx.fillText(text, 10, 30);
+                
+                // 初始条件
+                const initText = `初始条件: x₀ = ${params.initialPosition} m, v₀ = ${params.initialVelocity} m/s`;
+                ctx.fillText(initText, 10, 55);
+                
+                ctx.restore();
+            }
+
+            // 开始录制
+            async startRecording(sim) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        // 创建流
+                        const stream = this.exportCanvas.captureStream(30); // 30 fps
+                        
+                        // 创建媒体录制器
+                        this.mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'video/webm; codecs=vp9',
+                            videoBitsPerSecond: 8000000 // 8 Mbps
+                        });
+                        
+                        this.recordedChunks = [];
+                        
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                this.recordedChunks.push(event.data);
+                            }
+                        };
+                        
+                        this.mediaRecorder.onstop = () => {
+                            // 停止时的处理在外部进行
+                        };
+                        
+                        this.mediaRecorder.start();
+                        this.isRecording = true;
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            // 停止录制
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                }
+            }
+
+            // 保存视频（改进版，带视图类型）
+            saveVideo(sim, viewType) {
+                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                
+                let fileName = 'oscillation_';
+                if (this.simulatorType === 'simple') {
+                    fileName += 'simple_';
+                } else if (this.simulatorType === 'damped') {
+                    fileName += 'damped_';
+                } else {
+                    fileName += 'forced_';
+                }
+                
+                // 添加视图类型
+                fileName += viewType + '_';
+                
+                const date = new Date();
+                fileName += `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
+                fileName += `_${String(date.getHours()).padStart(2,'0')}${String(date.getMinutes()).padStart(2,'0')}${String(date.getSeconds()).padStart(2,'0')}`;
+                fileName += '.webm';
+                
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                // 清理
+                URL.revokeObjectURL(url);
+                this.recordedChunks = [];
+            }
+
+            // 导出完整的动画视频（展示点从左到右的移动过程）
+            async exportPeriod(sim) {
+                // 计算需要录制的总时长（展示完整的数据曲线）
+                const displayDuration = 10; // 在图表上显示10秒的数据
+                const totalDataTime = sim.data.time[sim.data.time.length - 1]; // 总数据时长
+                const recordingDuration = Math.min(totalDataTime, 20); // 最多录制20秒
+                
+                // 开始录制
+                await this.startRecording(sim);
+                
+                // 录制帧
+                const fps = 30;
+                const totalFrames = Math.ceil(recordingDuration * fps);
+                
+                for (let frameNum = 0; frameNum < totalFrames; frameNum++) {
+                    const progress = frameNum / totalFrames;
+                    const currentDataTime = progress * recordingDuration;
+                    const dataIndex = Math.floor(currentDataTime / 0.05); // 假设数据采样间隔为0.05s
+                    
+                    if (dataIndex < sim.data.time.length) {
+                        // 使用滚动窗口方式绘制
+                        this.recordFrameWithScrolling(sim, dataIndex, displayDuration);
+                    }
+                    
+                    // 等待下一帧
+                    await new Promise(resolve => setTimeout(resolve, 1000 / fps));
+                }
+                
+                // 停止录制
+                this.stopRecording();
+            }
+
+            // 录制带滚动效果的帧
+            recordFrameWithScrolling(sim, currentIndex, windowDuration) {
+                if (this.isRecording) {
+                    this.drawCompositeFrameWithScrolling(sim, currentIndex, windowDuration);
+                }
+            }
+
+            // 绘制带滚动效果的组合帧
+            drawCompositeFrameWithScrolling(sim, frameIndex, windowDuration) {
+                const ctx = this.exportCtx;
+                const width = this.exportCanvas.width;
+                const height = this.exportCanvas.height;
+                
+                // 清除画布
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 标题区域
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                let title = '';
+                if (this.simulatorType === 'simple') {
+                    title = '简谐振动 Simple Harmonic Motion';
+                } else if (this.simulatorType === 'damped') {
+                    title = '阻尼振动 Damped Oscillation';
+                } else {
+                    title = '受迫振动 Forced Oscillation';
+                }
+                ctx.fillText(title, width / 2, 50);
+                
+                // 时间信息
+                const currentTime = sim.data.time[frameIndex] || 0;
+                ctx.font = '24px Arial';
+                ctx.fillText(`t = ${currentTime.toFixed(2)} s`, width / 2, 90);
+                
+                // 主动画区域（左上）
+                const animWidth = 640;
+                const animHeight = 480;
+                const animX = 50;
+                const animY = 120;
+                
+                // 绘制主动画边框
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(animX, animY, animWidth, animHeight);
+                
+                // 绘制主动画
+                this.drawMainAnimationFrame(sim, frameIndex, animX, animY, animWidth, animHeight);
+                
+                // 图表区域（右侧和下方）
+                const chartWidth = 560;
+                const chartHeight = 230;
+                const chartStartX = animX + animWidth + 50;
+                const chartStartY = animY;
+                const chartGap = 20;
+                
+                // 位移图表（带滚动）
+                ctx.strokeRect(chartStartX, chartStartY, chartWidth, chartHeight);
+                this.drawScrollingChart(sim, 'displacement', frameIndex, chartStartX, chartStartY, chartWidth, chartHeight, windowDuration);
+                
+                // 速度图表（带滚动）
+                const chart2Y = chartStartY + chartHeight + chartGap;
+                ctx.strokeRect(chartStartX, chart2Y, chartWidth, chartHeight);
+                this.drawScrollingChart(sim, 'velocity', frameIndex, chartStartX, chart2Y, chartWidth, chartHeight, windowDuration);
+                
+                // 能量图表（带滚动）
+                const chart3X = animX;
+                const chart3Y = animY + animHeight + chartGap;
+                const chart3Width = 640;
+                ctx.strokeRect(chart3X, chart3Y, chart3Width, chartHeight);
+                this.drawScrollingChart(sim, 'energy', frameIndex, chart3X, chart3Y, chart3Width, chartHeight, windowDuration);
+                
+                // 特殊图表（相位图或共振曲线）
+                if (this.simulatorType === 'simple') {
+                    const chart4X = chart3X + chart3Width + 50;
+                    ctx.strokeRect(chart4X, chart3Y, chartWidth, chartHeight);
+                    this.drawChartFrame(sim, 'phase', frameIndex, chart4X, chart3Y, chartWidth, chartHeight);
+                } else if (this.simulatorType === 'forced') {
+                    const chart4X = chart3X + chart3Width + 50;
+                    ctx.strokeRect(chart4X, chart3Y, chartWidth, chartHeight);
+                    this.drawChartFrame(sim, 'resonance', frameIndex, chart4X, chart3Y, chartWidth, chartHeight);
+                }
+                
+                // 参数信息（底部）
+                this.drawParameterInfo(sim, frameIndex, 50, height - 100, width - 100, 80);
+            }
+
+            // 绘制滚动图表
+            drawScrollingChart(sim, chartType, currentIndex, x, y, width, height, windowDuration) {
+                const ctx = this.exportCtx;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                
+                // 背景
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 计算时间窗口
+                const currentTime = sim.data.time[currentIndex] || 0;
+                let startTime = Math.max(0, currentTime - windowDuration * 0.8); // 当前点在窗口的80%位置
+                let endTime = startTime + windowDuration;
+                
+                // 如果接近开始，调整窗口
+                if (currentTime < windowDuration * 0.8) {
+                    startTime = 0;
+                    endTime = windowDuration;
+                }
+                
+                // 找到对应的数据索引范围
+                const startIndex = Math.max(0, sim.data.time.findIndex(t => t >= startTime));
+                const endIndex = Math.min(sim.data.time.length - 1, sim.data.time.findIndex(t => t > endTime));
+                const actualEndIndex = endIndex === -1 ? sim.data.time.length - 1 : endIndex;
+                
+                // 坐标轴
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(width - 20, height - 30);
+                ctx.moveTo(40, height - 30);
+                ctx.lineTo(40, 20);
+                ctx.stroke();
+                
+                // 绘制数据
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                
+                if (chartType === 'displacement') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('位移 (m)', 0, 0);
+                    ctx.restore();
+                    
+                    // 绘制位移曲线
+                    this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1), 
+                                          sim.data.position.slice(startIndex, actualEndIndex + 1),
+                                          '#3498db', startTime, endTime, currentIndex - startIndex,
+                                          40, 20, width - 60, height - 50);
+                    
+                    // 如果是受迫振动，还要绘制外力
+                    if (this.simulatorType === 'forced') {
+                        const scaledForce = sim.data.force.slice(startIndex, actualEndIndex + 1).map(f => f * 0.3);
+                        this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1),
+                                              scaledForce, '#27ae60', startTime, endTime, -1,
+                                              40, 20, width - 60, height - 50);
+                    }
+                    
+                } else if (chartType === 'velocity') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('速度 (m/s)', 0, 0);
+                    ctx.restore();
+                    
+                    this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1),
+                                          sim.data.velocity.slice(startIndex, actualEndIndex + 1),
+                                          '#e74c3c', startTime, endTime, currentIndex - startIndex,
+                                          40, 20, width - 60, height - 50);
+                    
+                } else if (chartType === 'energy') {
+                    ctx.fillText('时间 (s)', width / 2, height - 5);
+                    ctx.save();
+                    ctx.translate(15, height / 2);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText('能量 (J)', 0, 0);
+                    ctx.restore();
+                    
+                    // 动能
+                    this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1),
+                                          sim.data.kineticEnergy.slice(startIndex, actualEndIndex + 1),
+                                          '#e74c3c', startTime, endTime, -1,
+                                          40, 20, width - 60, height - 50);
+                    // 势能
+                    this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1),
+                                          sim.data.potentialEnergy.slice(startIndex, actualEndIndex + 1),
+                                          '#3498db', startTime, endTime, -1,
+                                          40, 20, width - 60, height - 50);
+                    // 总能量
+                    this.drawScrollingLine(sim.data.time.slice(startIndex, actualEndIndex + 1),
+                                          sim.data.totalEnergy.slice(startIndex, actualEndIndex + 1),
+                                          '#2c3e50', startTime, endTime, -1,
+                                          40, 20, width - 60, height - 50);
+                    
+                    // 图例
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.fillRect(width - 80, 25, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('动能', width - 65, 33);
+                    
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillRect(width - 80, 40, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('势能', width - 65, 48);
+                    
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillRect(width - 80, 55, 10, 10);
+                    ctx.fillStyle = '#333';
+                    ctx.fillText('总能量', width - 65, 63);
+                }
+                
+                ctx.restore();
+            }
+
+            // 绘制滚动线条
+            drawScrollingLine(xData, yData, color, xMin, xMax, markerIndex, x, y, width, height) {
+                const ctx = this.exportCtx;
+                
+                if (xData.length === 0 || yData.length === 0) return;
+                
+                const yMin = Math.min(...yData);
+                const yMax = Math.max(...yData);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < xData.length; i++) {
+                    const px = x + (xData[i] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[i] - yMin) / (yMax - yMin) * height;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.stroke();
+                
+                // 标记当前点
+                if (markerIndex >= 0 && markerIndex < xData.length) {
+                    const px = x + (xData[markerIndex] - xMin) / (xMax - xMin) * width;
+                    const py = y + height - (yData[markerIndex] - yMin) / (yMax - yMin) * height;
+                    
+                    ctx.fillStyle = '#e67e22';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+        }
 
         // 切换模拟器
         function switchSimulator(type) {
@@ -913,6 +2308,9 @@
             canvases: {},
             contexts: {},
 
+            // 视频导出器
+            exporter: null,
+
             // 初始化
             init() {
                 this.initializeCanvases();
@@ -920,6 +2318,7 @@
                 this.calculatePhysics();
                 this.updateSystemInfo();
                 this.drawMainAnimation();
+                this.exporter = new VideoExporter('simple');
                 this.state.initialized = true;
             },
 
@@ -968,6 +2367,7 @@
                 document.getElementById('simple-pauseBtn').addEventListener('click', () => self.pauseAnimation());
                 document.getElementById('simple-resetBtn').addEventListener('click', () => self.resetAnimation());
                 document.getElementById('simple-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+                document.getElementById('simple-exportBtn').addEventListener('click', () => self.exportVideo());
 
                 // 标签页
                 document.querySelectorAll('#simple-chartsContent .tab-button').forEach(btn => {
@@ -1469,6 +2869,102 @@
                 } else if (canvasId.includes('phase')) {
                     this.drawPhaseChart();
                 }
+            },
+
+            // 导出视频（显示选项菜单）
+            async exportVideo() {
+                const statusEl = document.getElementById('simple-exportStatus');
+                const exportBtn = document.getElementById('simple-exportBtn');
+                
+                // 创建导出选项菜单
+                const options = `
+                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
+                    <button onclick="simpleSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
+                    <button onclick="simpleSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
+                    <button onclick="simpleSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
+                    <button onclick="simpleSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
+                    <button onclick="simpleSim.exportSpecificVideo('phase')" style="margin: 2px; padding: 8px;">相位图</button>
+                    <button onclick="simpleSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
+                    <button onclick="simpleSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                `;
+                
+                statusEl.innerHTML = options;
+                statusEl.className = 'export-status active';
+            },
+            
+            // 取消导出
+            cancelExport() {
+                const statusEl = document.getElementById('simple-exportStatus');
+                statusEl.classList.remove('active');
+            },
+            
+            // 导出特定视频
+            async exportSpecificVideo(videoType) {
+                const statusEl = document.getElementById('simple-exportStatus');
+                const exportBtn = document.getElementById('simple-exportBtn');
+                
+                try {
+                    // 暂停动画
+                    const wasPlaying = this.state.isPlaying;
+                    this.pauseAnimation();
+                    
+                    // 确保所有图表都显示（如果需要）
+                    if (videoType !== 'animation' && !this.state.chartsVisible) {
+                        this.toggleCharts();
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    if (videoType === 'all') {
+                        // 导出所有视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = '🔴 正在导出所有视频...';
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportAllVideos(this);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = '✅ 所有视频导出成功！';
+                    } else {
+                        // 导出单个视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = `🔴 正在导出${this.getVideoTypeName(videoType)}...`;
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportSingleVideo(this, videoType);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = `✅ ${this.getVideoTypeName(videoType)}导出成功！`;
+                    }
+                    
+                    // 恢复动画状态
+                    if (wasPlaying) {
+                        this.startAnimation();
+                    }
+                    
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    statusEl.className = 'export-status active error';
+                    statusEl.textContent = '❌ 导出失败: ' + error.message;
+                } finally {
+                    exportBtn.disabled = false;
+                    
+                    // 3秒后隐藏状态
+                    setTimeout(() => {
+                        statusEl.classList.remove('active');
+                    }, 3000);
+                }
+            },
+            
+            // 获取视频类型名称
+            getVideoTypeName(videoType) {
+                const names = {
+                    'animation': '主动画视频',
+                    'displacement': '位移图视频',
+                    'velocity': '速度图视频',
+                    'energy': '能量图视频',
+                    'phase': '相位图视频'
+                };
+                return names[videoType] || videoType;
             }
         };
 
@@ -1507,6 +3003,9 @@
             canvases: {},
             contexts: {},
 
+            // 视频导出器
+            exporter: null,
+
             // 初始化
             init() {
                 this.initializeCanvases();
@@ -1514,6 +3013,7 @@
                 this.calculatePhysics();
                 this.updateSystemInfo();
                 this.drawMainAnimation();
+                this.exporter = new VideoExporter('damped');
                 this.state.initialized = true;
             },
 
@@ -1562,6 +3062,7 @@
                 document.getElementById('damped-pauseBtn').addEventListener('click', () => self.pauseAnimation());
                 document.getElementById('damped-resetBtn').addEventListener('click', () => self.resetAnimation());
                 document.getElementById('damped-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+                document.getElementById('damped-exportBtn').addEventListener('click', () => self.exportVideo());
 
                 // 标签页
                 document.querySelectorAll('#damped-chartsContent .tab-button').forEach(btn => {
@@ -2021,6 +3522,100 @@
                 } else if (canvasId.includes('energy')) {
                     this.drawEnergyChart();
                 }
+            },
+
+            // 导出视频（显示选项菜单）
+            async exportVideo() {
+                const statusEl = document.getElementById('damped-exportStatus');
+                const exportBtn = document.getElementById('damped-exportBtn');
+                
+                // 创建导出选项菜单
+                const options = `
+                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
+                    <button onclick="dampedSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
+                    <button onclick="dampedSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
+                    <button onclick="dampedSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
+                    <button onclick="dampedSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
+                    <button onclick="dampedSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
+                    <button onclick="dampedSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                `;
+                
+                statusEl.innerHTML = options;
+                statusEl.className = 'export-status active';
+            },
+            
+            // 取消导出
+            cancelExport() {
+                const statusEl = document.getElementById('damped-exportStatus');
+                statusEl.classList.remove('active');
+            },
+            
+            // 导出特定视频
+            async exportSpecificVideo(videoType) {
+                const statusEl = document.getElementById('damped-exportStatus');
+                const exportBtn = document.getElementById('damped-exportBtn');
+                
+                try {
+                    // 暂停动画
+                    const wasPlaying = this.state.isPlaying;
+                    this.pauseAnimation();
+                    
+                    // 确保所有图表都显示（如果需要）
+                    if (videoType !== 'animation' && !this.state.chartsVisible) {
+                        this.toggleCharts();
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    if (videoType === 'all') {
+                        // 导出所有视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = '🔴 正在导出所有视频...';
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportAllVideos(this);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = '✅ 所有视频导出成功！';
+                    } else {
+                        // 导出单个视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = `🔴 正在导出${this.getVideoTypeName(videoType)}...`;
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportSingleVideo(this, videoType);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = `✅ ${this.getVideoTypeName(videoType)}导出成功！`;
+                    }
+                    
+                    // 恢复动画状态
+                    if (wasPlaying) {
+                        this.startAnimation();
+                    }
+                    
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    statusEl.className = 'export-status active error';
+                    statusEl.textContent = '❌ 导出失败: ' + error.message;
+                } finally {
+                    exportBtn.disabled = false;
+                    
+                    // 3秒后隐藏状态
+                    setTimeout(() => {
+                        statusEl.classList.remove('active');
+                    }, 3000);
+                }
+            },
+            
+            // 获取视频类型名称
+            getVideoTypeName(videoType) {
+                const names = {
+                    'animation': '主动画视频',
+                    'displacement': '位移图视频',
+                    'velocity': '速度图视频',
+                    'energy': '能量图视频'
+                };
+                return names[videoType] || videoType;
             }
         };
 
@@ -2069,6 +3664,9 @@
             canvases: {},
             contexts: {},
 
+            // 视频导出器
+            exporter: null,
+
             // 初始化
             init() {
                 this.initializeCanvases();
@@ -2077,6 +3675,7 @@
                 this.calculateResonanceCurve();
                 this.updateSystemInfo();
                 this.drawMainAnimation();
+                this.exporter = new VideoExporter('forced');
                 this.state.initialized = true;
             },
 
@@ -2122,6 +3721,7 @@
                 document.getElementById('forced-pauseBtn').addEventListener('click', () => self.pauseAnimation());
                 document.getElementById('forced-resetBtn').addEventListener('click', () => self.resetAnimation());
                 document.getElementById('forced-toggleChartsBtn').addEventListener('click', () => self.toggleCharts());
+                document.getElementById('forced-exportBtn').addEventListener('click', () => self.exportVideo());
 
                 document.querySelectorAll('#forced-chartsContent .tab-button').forEach(btn => {
                     btn.addEventListener('click', function() {
@@ -2723,6 +4323,102 @@
                 } else if (canvasId.includes('resonance')) {
                     this.drawResonanceChart();
                 }
+            },
+
+            // 导出视频（显示选项菜单）
+            async exportVideo() {
+                const statusEl = document.getElementById('forced-exportStatus');
+                const exportBtn = document.getElementById('forced-exportBtn');
+                
+                // 创建导出选项菜单
+                const options = `
+                    <div style="margin-bottom: 10px; font-weight: bold;">选择要导出的视频：</div>
+                    <button onclick="forcedSim.exportSpecificVideo('animation')" style="margin: 2px; padding: 8px;">主动画</button>
+                    <button onclick="forcedSim.exportSpecificVideo('displacement')" style="margin: 2px; padding: 8px;">位移图</button>
+                    <button onclick="forcedSim.exportSpecificVideo('velocity')" style="margin: 2px; padding: 8px;">速度图</button>
+                    <button onclick="forcedSim.exportSpecificVideo('energy')" style="margin: 2px; padding: 8px;">能量图</button>
+                    <button onclick="forcedSim.exportSpecificVideo('resonance')" style="margin: 2px; padding: 8px;">共振曲线</button>
+                    <button onclick="forcedSim.exportSpecificVideo('all')" style="margin: 2px; padding: 8px; background: #27ae60; color: white;">导出全部</button>
+                    <button onclick="forcedSim.cancelExport()" style="margin: 2px; padding: 8px; background: #e74c3c; color: white;">取消</button>
+                `;
+                
+                statusEl.innerHTML = options;
+                statusEl.className = 'export-status active';
+            },
+            
+            // 取消导出
+            cancelExport() {
+                const statusEl = document.getElementById('forced-exportStatus');
+                statusEl.classList.remove('active');
+            },
+            
+            // 导出特定视频
+            async exportSpecificVideo(videoType) {
+                const statusEl = document.getElementById('forced-exportStatus');
+                const exportBtn = document.getElementById('forced-exportBtn');
+                
+                try {
+                    // 暂停动画
+                    const wasPlaying = this.state.isPlaying;
+                    this.pauseAnimation();
+                    
+                    // 确保所有图表都显示（如果需要）
+                    if (videoType !== 'animation' && !this.state.chartsVisible) {
+                        this.toggleCharts();
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    if (videoType === 'all') {
+                        // 导出所有视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = '🔴 正在导出所有视频...';
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportAllVideos(this);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = '✅ 所有视频导出成功！';
+                    } else {
+                        // 导出单个视频
+                        statusEl.className = 'export-status active recording';
+                        statusEl.textContent = `🔴 正在导出${this.getVideoTypeName(videoType)}...`;
+                        exportBtn.disabled = true;
+                        
+                        await this.exporter.exportSingleVideo(this, videoType);
+                        
+                        statusEl.className = 'export-status active success';
+                        statusEl.textContent = `✅ ${this.getVideoTypeName(videoType)}导出成功！`;
+                    }
+                    
+                    // 恢复动画状态
+                    if (wasPlaying) {
+                        this.startAnimation();
+                    }
+                    
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    statusEl.className = 'export-status active error';
+                    statusEl.textContent = '❌ 导出失败: ' + error.message;
+                } finally {
+                    exportBtn.disabled = false;
+                    
+                    // 3秒后隐藏状态
+                    setTimeout(() => {
+                        statusEl.classList.remove('active');
+                    }, 3000);
+                }
+            },
+            
+            // 获取视频类型名称
+            getVideoTypeName(videoType) {
+                const names = {
+                    'animation': '主动画视频',
+                    'displacement': '位移图视频',
+                    'velocity': '速度图视频',
+                    'energy': '能量图视频',
+                    'resonance': '共振曲线视频'
+                };
+                return names[videoType] || videoType;
             }
         };
 
