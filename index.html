@@ -464,8 +464,59 @@
                 height: 400px;
             }
 
+            /* 电脑端默认显示所有图表 */
+            .charts-content {
+                display: block !important;
+            }
+
+            .charts-header {
+                display: none; /* 隐藏显示/隐藏按钮 */
+            }
+
+            /* 移除标签页，改为网格布局 */
+            .tabs {
+                display: none;
+            }
+
             .charts-canvas-container {
-                height: 450px;
+                position: relative;
+                width: 100%;
+                height: auto;
+                background: transparent;
+                overflow: visible;
+            }
+
+            /* 图表网格布局 */
+            .charts-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-top: 20px;
+            }
+
+            .chart-wrapper {
+                background: white;
+                border-radius: 10px;
+                padding: 15px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+
+            .chart-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 10px;
+                text-align: center;
+            }
+
+            .chart-canvas {
+                position: relative !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                width: 100%;
+                height: 300px;
+                display: block;
+                background: white;
             }
         }
 
@@ -483,8 +534,13 @@
                 height: 450px;
             }
 
-            .charts-canvas-container {
-                height: 500px;
+            .chart-canvas {
+                height: 350px;
+            }
+
+            /* 大屏幕上可以显示更多列 */
+            .charts-grid {
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             }
         }
 
@@ -501,8 +557,27 @@
                 height: 500px;
             }
 
-            .charts-canvas-container {
-                height: 550px;
+            .chart-canvas {
+                height: 400px;
+            }
+
+            /* 超大屏幕横向布局 */
+            .main-content {
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 30px;
+            }
+
+            .left-panel {
+                grid-column: 1;
+            }
+
+            .right-panel {
+                grid-column: 2;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr 1fr;
             }
         }
     </style>
@@ -1418,8 +1493,17 @@ const simpleSim = {
         
         this.drawMainAnimation();
         
+        // 检查是否为电脑端
+        const isDesktop = window.innerWidth >= 1024;
+        
         if (this.state.chartsVisible) {
-            this.drawCurrentChart();
+            if (isDesktop) {
+                // 电脑端更新所有图表
+                this.drawAllCharts();
+            } else {
+                // 移动端只更新当前激活的图表
+                this.drawCurrentChart();
+            }
         }
         
         this.state.animationId = requestAnimationFrame(() => this.animate());
@@ -1535,6 +1619,24 @@ const simpleSim = {
         } else if (canvasId.includes('phase')) {
             this.drawPhaseChart();
         }
+    },
+
+    // 绘制所有图表（电脑端使用）
+    drawAllCharts() {
+        // 确保所有canvas都已初始化
+        ['displacement', 'velocity', 'energy', 'phase'].forEach(id => {
+            const canvas = document.getElementById('simple-' + id + 'Canvas');
+            if (canvas && !this.contexts[id]) {
+                this.contexts[id] = canvas.getContext('2d');
+                this.setCanvasSize(canvas);
+            }
+        });
+        
+        // 绘制所有图表
+        this.drawDisplacementChart();
+        this.drawVelocityChart();
+        this.drawEnergyChart();
+        this.drawPhaseChart();
     }
 };
 
@@ -1976,8 +2078,17 @@ const dampedSim = {
         
         this.drawMainAnimation();
         
+        // 检查是否为电脑端
+        const isDesktop = window.innerWidth >= 1024;
+        
         if (this.state.chartsVisible) {
-            this.drawCurrentChart();
+            if (isDesktop) {
+                // 电脑端更新所有图表
+                this.drawAllCharts();
+            } else {
+                // 移动端只更新当前激活的图表
+                this.drawCurrentChart();
+            }
         }
         
         this.state.animationId = requestAnimationFrame(() => this.animate());
@@ -2087,6 +2198,23 @@ const dampedSim = {
         } else if (canvasId.includes('energy')) {
             this.drawEnergyChart();
         }
+    },
+
+    // 绘制所有图表（电脑端使用）
+    drawAllCharts() {
+        // 确保所有canvas都已初始化
+        ['displacement', 'velocity', 'energy'].forEach(id => {
+            const canvas = document.getElementById('damped-' + id + 'Canvas');
+            if (canvas && !this.contexts[id]) {
+                this.contexts[id] = canvas.getContext('2d');
+                this.setCanvasSize(canvas);
+            }
+        });
+        
+        // 绘制所有图表
+        this.drawDisplacementChart();
+        this.drawVelocityChart();
+        this.drawEnergyChart();
     }
 };
 
@@ -2671,8 +2799,17 @@ const forcedSim = {
         
         this.drawMainAnimation();
         
+        // 检查是否为电脑端
+        const isDesktop = window.innerWidth >= 1024;
+        
         if (this.state.chartsVisible) {
-            this.drawCurrentChart();
+            if (isDesktop) {
+                // 电脑端更新所有图表
+                this.drawAllCharts();
+            } else {
+                // 移动端只更新当前激活的图表
+                this.drawCurrentChart();
+            }
         }
         
         this.state.animationId = requestAnimationFrame(() => this.animate());
@@ -2789,12 +2926,38 @@ const forcedSim = {
         } else if (canvasId.includes('resonance')) {
             this.drawResonanceChart();
         }
+    },
+
+    // 绘制所有图表（电脑端使用）
+    drawAllCharts() {
+        // 确保所有canvas都已初始化
+        ['displacement', 'velocity', 'energy', 'resonance'].forEach(id => {
+            const canvas = document.getElementById('forced-' + id + 'Canvas');
+            if (canvas && !this.contexts[id]) {
+                this.contexts[id] = canvas.getContext('2d');
+                this.setCanvasSize(canvas);
+            }
+        });
+        
+        // 绘制所有图表
+        this.drawDisplacementChart();
+        this.drawVelocityChart();
+        this.drawEnergyChart();
+        this.drawResonanceChart();
     }
 };
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('振动系统综合模拟器加载中...');
+    
+    // 检测是否为电脑端
+    const isDesktop = window.innerWidth >= 1024;
+    
+    // 如果是电脑端，重新组织图表布局
+    if (isDesktop) {
+        setupDesktopLayout();
+    }
     
     // 初始化三个模拟器
     simpleSim.init();
@@ -2807,18 +2970,117 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('forcedBtn').addEventListener('click', () => switchSimulator('forced'));
     
     // 窗口调整事件
+    let resizeTimeout;
     window.addEventListener('resize', () => {
-        if (currentSimulator === 'simple') {
-            simpleSim.handleResize();
-        } else if (currentSimulator === 'damped') {
-            dampedSim.handleResize();
-        } else {
-            forcedSim.handleResize();
-        }
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            const wasDesktop = document.body.classList.contains('desktop-layout');
+            const isNowDesktop = window.innerWidth >= 1024;
+            
+            // 如果布局模式改变了
+            if (wasDesktop !== isNowDesktop) {
+                if (isNowDesktop) {
+                    setupDesktopLayout();
+                } else {
+                    removeDesktopLayout();
+                }
+            }
+            
+            if (currentSimulator === 'simple') {
+                simpleSim.handleResize();
+                if (isNowDesktop) {
+                    // 电脑端立即绘制所有图表
+                    simpleSim.drawAllCharts();
+                }
+            } else if (currentSimulator === 'damped') {
+                dampedSim.handleResize();
+                if (isNowDesktop) {
+                    dampedSim.drawAllCharts();
+                }
+            } else {
+                forcedSim.handleResize();
+                if (isNowDesktop) {
+                    forcedSim.drawAllCharts();
+                }
+            }
+        }, 250);
     });
+    
+    // 如果是电脑端，默认显示所有图表
+    if (isDesktop) {
+        setTimeout(() => {
+            simpleSim.state.chartsVisible = true;
+            simpleSim.drawAllCharts();
+        }, 100);
+    }
     
     console.log('振动系统综合模拟器初始化完成！');
 });
+
+// 设置电脑端布局
+function setupDesktopLayout() {
+    document.body.classList.add('desktop-layout');
+    
+    // 重新组织简谐振动图表
+    const simpleChartsContainer = document.getElementById('simple-chartsContent');
+    if (simpleChartsContainer) {
+        reorganizeCharts(simpleChartsContainer, 'simple', ['位移', '速度', '能量', '相位图']);
+    }
+    
+    // 重新组织阻尼振动图表
+    const dampedChartsContainer = document.getElementById('damped-chartsContent');
+    if (dampedChartsContainer) {
+        reorganizeCharts(dampedChartsContainer, 'damped', ['位移', '速度', '能量']);
+    }
+    
+    // 重新组织受迫振动图表
+    const forcedChartsContainer = document.getElementById('forced-chartsContent');
+    if (forcedChartsContainer) {
+        reorganizeCharts(forcedChartsContainer, 'forced', ['位移', '速度', '能量', '共振曲线']);
+    }
+}
+
+// 移除电脑端布局
+function removeDesktopLayout() {
+    document.body.classList.remove('desktop-layout');
+    // 恢复原始布局
+    location.reload(); // 简单起见，重新加载页面
+}
+
+// 重新组织图表为网格布局
+function reorganizeCharts(container, prefix, titles) {
+    // 创建网格容器
+    let gridContainer = container.querySelector('.charts-grid');
+    if (!gridContainer) {
+        gridContainer = document.createElement('div');
+        gridContainer.className = 'charts-grid';
+        
+        // 获取所有canvas
+        const canvases = container.querySelectorAll('.chart-canvas');
+        const chartIds = ['displacement', 'velocity', 'energy', prefix === 'simple' ? 'phase' : (prefix === 'forced' ? 'resonance' : null)].filter(Boolean);
+        
+        chartIds.forEach((id, index) => {
+            const canvas = document.getElementById(prefix + '-' + id + 'Canvas');
+            if (canvas) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'chart-wrapper';
+                
+                const title = document.createElement('div');
+                title.className = 'chart-title';
+                title.textContent = titles[index];
+                
+                wrapper.appendChild(title);
+                wrapper.appendChild(canvas.cloneNode(true));
+                gridContainer.appendChild(wrapper);
+            }
+        });
+        
+        // 替换原有内容
+        container.innerHTML = '';
+        container.appendChild(gridContainer);
+        container.style.display = 'block';
+    }
+}
     </script>
 </body>
 </html>
