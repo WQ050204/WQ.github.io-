@@ -2951,14 +2951,6 @@ const forcedSim = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('振动系统综合模拟器加载中...');
     
-    // 检测是否为电脑端
-    const isDesktop = window.innerWidth >= 1024;
-    
-    // 如果是电脑端，重新组织图表布局
-    if (isDesktop) {
-        setupDesktopLayout();
-    }
-    
     // 初始化三个模拟器
     simpleSim.init();
     dampedSim.init();
@@ -2969,116 +2961,183 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('dampedBtn').addEventListener('click', () => switchSimulator('damped'));
     document.getElementById('forcedBtn').addEventListener('click', () => switchSimulator('forced'));
     
+    // 检测是否为电脑端并设置布局
+    const isDesktop = window.innerWidth >= 1024;
+    if (isDesktop) {
+        // 延迟执行以确保DOM完全加载
+        setTimeout(() => {
+            setupDesktopCharts();
+        }, 200);
+    }
+    
     // 窗口调整事件
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
-            const wasDesktop = document.body.classList.contains('desktop-layout');
             const isNowDesktop = window.innerWidth >= 1024;
-            
-            // 如果布局模式改变了
-            if (wasDesktop !== isNowDesktop) {
-                if (isNowDesktop) {
-                    setupDesktopLayout();
-                } else {
-                    removeDesktopLayout();
-                }
-            }
             
             if (currentSimulator === 'simple') {
                 simpleSim.handleResize();
                 if (isNowDesktop) {
-                    // 电脑端立即绘制所有图表
+                    simpleSim.state.chartsVisible = true;
                     simpleSim.drawAllCharts();
                 }
             } else if (currentSimulator === 'damped') {
                 dampedSim.handleResize();
                 if (isNowDesktop) {
+                    dampedSim.state.chartsVisible = true;
                     dampedSim.drawAllCharts();
                 }
             } else {
                 forcedSim.handleResize();
                 if (isNowDesktop) {
+                    forcedSim.state.chartsVisible = true;
                     forcedSim.drawAllCharts();
                 }
             }
         }, 250);
     });
     
-    // 如果是电脑端，默认显示所有图表
-    if (isDesktop) {
+    console.log('振动系统综合模拟器初始化完成！');
+});
+
+// 设置电脑端图表布局
+function setupDesktopCharts() {
+    const isDesktop = window.innerWidth >= 1024;
+    if (!isDesktop) return;
+    
+    // 处理简谐振动图表
+    const simpleContainer = document.getElementById('simple-chartsContent');
+    if (simpleContainer) {
+        simpleContainer.classList.add('active');
+        simpleContainer.style.display = 'block';
+        
+        // 创建网格布局
+        if (!simpleContainer.querySelector('.desktop-charts-grid')) {
+            const grid = document.createElement('div');
+            grid.className = 'desktop-charts-grid';
+            
+            // 创建图表包装器
+            const charts = [
+                { id: 'simple-displacementCanvas', title: '位移-时间图' },
+                { id: 'simple-velocityCanvas', title: '速度-时间图' },
+                { id: 'simple-energyCanvas', title: '能量变化图' },
+                { id: 'simple-phaseCanvas', title: '相位图' }
+            ];
+            
+            charts.forEach(chart => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'desktop-chart-wrapper';
+                
+                const title = document.createElement('div');
+                title.className = 'desktop-chart-title';
+                title.textContent = chart.title;
+                
+                const canvas = document.getElementById(chart.id);
+                if (canvas) {
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(canvas);
+                    grid.appendChild(wrapper);
+                }
+            });
+            
+            simpleContainer.innerHTML = '';
+            simpleContainer.appendChild(grid);
+        }
+        
+        // 立即绘制所有图表
+        simpleSim.state.chartsVisible = true;
         setTimeout(() => {
-            simpleSim.state.chartsVisible = true;
             simpleSim.drawAllCharts();
         }, 100);
     }
     
-    console.log('振动系统综合模拟器初始化完成！');
-});
-
-// 设置电脑端布局
-function setupDesktopLayout() {
-    document.body.classList.add('desktop-layout');
-    
-    // 重新组织简谐振动图表
-    const simpleChartsContainer = document.getElementById('simple-chartsContent');
-    if (simpleChartsContainer) {
-        reorganizeCharts(simpleChartsContainer, 'simple', ['位移', '速度', '能量', '相位图']);
-    }
-    
-    // 重新组织阻尼振动图表
-    const dampedChartsContainer = document.getElementById('damped-chartsContent');
-    if (dampedChartsContainer) {
-        reorganizeCharts(dampedChartsContainer, 'damped', ['位移', '速度', '能量']);
-    }
-    
-    // 重新组织受迫振动图表
-    const forcedChartsContainer = document.getElementById('forced-chartsContent');
-    if (forcedChartsContainer) {
-        reorganizeCharts(forcedChartsContainer, 'forced', ['位移', '速度', '能量', '共振曲线']);
-    }
-}
-
-// 移除电脑端布局
-function removeDesktopLayout() {
-    document.body.classList.remove('desktop-layout');
-    // 恢复原始布局
-    location.reload(); // 简单起见，重新加载页面
-}
-
-// 重新组织图表为网格布局
-function reorganizeCharts(container, prefix, titles) {
-    // 创建网格容器
-    let gridContainer = container.querySelector('.charts-grid');
-    if (!gridContainer) {
-        gridContainer = document.createElement('div');
-        gridContainer.className = 'charts-grid';
+    // 处理阻尼振动图表
+    const dampedContainer = document.getElementById('damped-chartsContent');
+    if (dampedContainer) {
+        dampedContainer.classList.add('active');
+        dampedContainer.style.display = 'block';
         
-        // 获取所有canvas
-        const canvases = container.querySelectorAll('.chart-canvas');
-        const chartIds = ['displacement', 'velocity', 'energy', prefix === 'simple' ? 'phase' : (prefix === 'forced' ? 'resonance' : null)].filter(Boolean);
-        
-        chartIds.forEach((id, index) => {
-            const canvas = document.getElementById(prefix + '-' + id + 'Canvas');
-            if (canvas) {
+        if (!dampedContainer.querySelector('.desktop-charts-grid')) {
+            const grid = document.createElement('div');
+            grid.className = 'desktop-charts-grid';
+            
+            const charts = [
+                { id: 'damped-displacementCanvas', title: '位移-时间图' },
+                { id: 'damped-velocityCanvas', title: '速度-时间图' },
+                { id: 'damped-energyCanvas', title: '能量变化图' }
+            ];
+            
+            charts.forEach(chart => {
                 const wrapper = document.createElement('div');
-                wrapper.className = 'chart-wrapper';
+                wrapper.className = 'desktop-chart-wrapper';
                 
                 const title = document.createElement('div');
-                title.className = 'chart-title';
-                title.textContent = titles[index];
+                title.className = 'desktop-chart-title';
+                title.textContent = chart.title;
                 
-                wrapper.appendChild(title);
-                wrapper.appendChild(canvas.cloneNode(true));
-                gridContainer.appendChild(wrapper);
-            }
-        });
+                const canvas = document.getElementById(chart.id);
+                if (canvas) {
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(canvas);
+                    grid.appendChild(wrapper);
+                }
+            });
+            
+            dampedContainer.innerHTML = '';
+            dampedContainer.appendChild(grid);
+        }
         
-        // 替换原有内容
-        container.innerHTML = '';
-        container.appendChild(gridContainer);
-        container.style.display = 'block';
+        // 立即绘制所有图表
+        dampedSim.state.chartsVisible = true;
+        setTimeout(() => {
+            dampedSim.drawAllCharts();
+        }, 100);
+    }
+    
+    // 处理受迫振动图表
+    const forcedContainer = document.getElementById('forced-chartsContent');
+    if (forcedContainer) {
+        forcedContainer.classList.add('active');
+        forcedContainer.style.display = 'block';
+        
+        if (!forcedContainer.querySelector('.desktop-charts-grid')) {
+            const grid = document.createElement('div');
+            grid.className = 'desktop-charts-grid';
+            
+            const charts = [
+                { id: 'forced-displacementCanvas', title: '位移-时间图' },
+                { id: 'forced-velocityCanvas', title: '速度-时间图' },
+                { id: 'forced-energyCanvas', title: '能量变化图' },
+                { id: 'forced-resonanceCanvas', title: '共振曲线' }
+            ];
+            
+            charts.forEach(chart => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'desktop-chart-wrapper';
+                
+                const title = document.createElement('div');
+                title.className = 'desktop-chart-title';
+                title.textContent = chart.title;
+                
+                const canvas = document.getElementById(chart.id);
+                if (canvas) {
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(canvas);
+                    grid.appendChild(wrapper);
+                }
+            });
+            
+            forcedContainer.innerHTML = '';
+            forcedContainer.appendChild(grid);
+        }
+        
+        // 立即绘制所有图表
+        forcedSim.state.chartsVisible = true;
+        setTimeout(() => {
+            forcedSim.drawAllCharts();
+        }, 100);
     }
 }
     </script>
