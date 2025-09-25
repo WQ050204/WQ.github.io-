@@ -3306,35 +3306,35 @@ function setupDesktopThreeColumnLayout() {
         const mainContent = container.querySelector('.main-content');
         if (!mainContent || mainContent.classList.contains('desktop-layout')) return;
         
-        // 克隆原始元素
-        const parametersSection = mainContent.querySelector('.parameters-section').cloneNode(true);
-        const controlButtons = mainContent.querySelector('.control-buttons').cloneNode(true);
-        const infoSection = mainContent.querySelector('.info-section').cloneNode(true);
-        const animationContainer = mainContent.querySelector('.animation-container').cloneNode(true);
-        const chartsSection = mainContent.querySelector('.charts-section').cloneNode(true);
+        // 获取原始元素（不克隆，直接移动）
+        const parametersSection = mainContent.querySelector('.parameters-section');
+        const controlButtons = mainContent.querySelector('.control-buttons');
+        const infoSection = mainContent.querySelector('.info-section');
+        const animationContainer = mainContent.querySelector('.animation-container');
+        const chartsSection = mainContent.querySelector('.charts-section');
         
         // 创建三栏布局
-        mainContent.innerHTML = '';
-        mainContent.classList.add('desktop-layout');
+        const desktopContainer = document.createElement('div');
+        desktopContainer.className = 'main-content desktop-layout';
         
         // 左栏 - 参数控制
         const leftColumn = document.createElement('div');
         leftColumn.className = 'desktop-left-column';
-        leftColumn.appendChild(controlButtons);
-        leftColumn.appendChild(parametersSection);
-        leftColumn.appendChild(infoSection);
+        if (controlButtons) leftColumn.appendChild(controlButtons);
+        if (parametersSection) leftColumn.appendChild(parametersSection);
+        if (infoSection) leftColumn.appendChild(infoSection);
         
         // 中栏 - 动画演示
         const centerColumn = document.createElement('div');
         centerColumn.className = 'desktop-center-column';
-        centerColumn.appendChild(animationContainer);
+        if (animationContainer) centerColumn.appendChild(animationContainer);
         
         // 右栏 - 图表展示
         const rightColumn = document.createElement('div');
         rightColumn.className = 'desktop-right-column';
         
         // 处理图表
-        const chartsContent = chartsSection.querySelector('.charts-content');
+        const chartsContent = chartsSection ? chartsSection.querySelector('.charts-content') : null;
         if (chartsContent) {
             chartsContent.classList.add('active');
             chartsContent.style.display = 'block';
@@ -3343,31 +3343,42 @@ function setupDesktopThreeColumnLayout() {
             const chartsGrid = document.createElement('div');
             chartsGrid.className = 'desktop-charts-grid';
             
-            // 根据模拟器类型添加相应的图表
-            let charts = [];
+            // 根据模拟器类型获取相应的图表
+            let chartIds = [];
             if (prefix === 'simple') {
-                charts = [
-                    { id: prefix + '-displacementCanvas', title: '位移-时间图' },
-                    { id: prefix + '-velocityCanvas', title: '速度-时间图' },
-                    { id: prefix + '-energyCanvas', title: '能量变化图' },
-                    { id: prefix + '-phaseCanvas', title: '相位图' }
+                chartIds = [
+                    { id: 'displacement', title: '位移-时间图' },
+                    { id: 'velocity', title: '速度-时间图' },
+                    { id: 'energy', title: '能量变化图' },
+                    { id: 'phase', title: '相位图' }
                 ];
             } else if (prefix === 'damped') {
-                charts = [
-                    { id: prefix + '-displacementCanvas', title: '位移-时间图' },
-                    { id: prefix + '-velocityCanvas', title: '速度-时间图' },
-                    { id: prefix + '-energyCanvas', title: '能量变化图' }
+                chartIds = [
+                    { id: 'displacement', title: '位移-时间图' },
+                    { id: 'velocity', title: '速度-时间图' },
+                    { id: 'energy', title: '能量变化图' }
                 ];
             } else if (prefix === 'forced') {
-                charts = [
-                    { id: prefix + '-displacementCanvas', title: '位移-时间图' },
-                    { id: prefix + '-velocityCanvas', title: '速度-时间图' },
-                    { id: prefix + '-energyCanvas', title: '能量变化图' },
-                    { id: prefix + '-resonanceCanvas', title: '共振曲线' }
+                chartIds = [
+                    { id: 'displacement', title: '位移-时间图' },
+                    { id: 'velocity', title: '速度-时间图' },
+                    { id: 'energy', title: '能量变化图' },
+                    { id: 'resonance', title: '共振曲线' }
                 ];
             }
             
-            charts.forEach(chart => {
+            // 移动原始canvas而不是克隆
+            chartIds.forEach(chart => {
+                const canvasId = prefix + '-' + chart.id + 'Canvas';
+                let canvas = document.getElementById(canvasId);
+                
+                if (!canvas) {
+                    // 如果canvas不存在，创建一个新的
+                    canvas = document.createElement('canvas');
+                    canvas.id = canvasId;
+                    canvas.className = 'chart-canvas';
+                }
+                
                 const wrapper = document.createElement('div');
                 wrapper.className = 'desktop-chart-wrapper';
                 
@@ -3375,48 +3386,47 @@ function setupDesktopThreeColumnLayout() {
                 title.className = 'desktop-chart-title';
                 title.textContent = chart.title;
                 
-                let canvas = document.getElementById(chart.id);
-                if (canvas) {
-                    canvas = canvas.cloneNode(true);
-                    wrapper.appendChild(title);
-                    wrapper.appendChild(canvas);
-                    chartsGrid.appendChild(wrapper);
-                }
+                wrapper.appendChild(title);
+                wrapper.appendChild(canvas);
+                chartsGrid.appendChild(wrapper);
             });
             
             rightColumn.appendChild(chartsGrid);
         }
         
-        // 添加三栏到主容器
-        mainContent.appendChild(leftColumn);
-        mainContent.appendChild(centerColumn);
-        mainContent.appendChild(rightColumn);
+        // 添加三栏到新容器
+        desktopContainer.appendChild(leftColumn);
+        desktopContainer.appendChild(centerColumn);
+        desktopContainer.appendChild(rightColumn);
         
-        // 重新初始化事件监听器和canvas引用
+        // 替换原有的main-content
+        mainContent.parentNode.replaceChild(desktopContainer, mainContent);
+        
+        // 重新初始化当前活动的模拟器
         setTimeout(() => {
-            if (prefix === 'simple') {
-                simpleSim.reinitializeForDesktop();
-            } else if (prefix === 'damped') {
-                dampedSim.reinitializeForDesktop();
-            } else if (prefix === 'forced') {
-                forcedSim.reinitializeForDesktop();
+            if (prefix === currentSimulator) {
+                if (prefix === 'simple') {
+                    simpleSim.initializeCanvases();
+                    simpleSim.setupEventListeners();
+                    simpleSim.drawMainAnimation();
+                    simpleSim.state.chartsVisible = true;
+                    simpleSim.drawAllCharts();
+                } else if (prefix === 'damped') {
+                    dampedSim.initializeCanvases();
+                    dampedSim.setupEventListeners();
+                    dampedSim.drawMainAnimation();
+                    dampedSim.state.chartsVisible = true;
+                    dampedSim.drawAllCharts();
+                } else if (prefix === 'forced') {
+                    forcedSim.initializeCanvases();
+                    forcedSim.setupEventListeners();
+                    forcedSim.drawMainAnimation();
+                    forcedSim.state.chartsVisible = true;
+                    forcedSim.drawAllCharts();
+                }
             }
         }, 100);
     });
-    
-    // 立即绘制当前模拟器的图表
-    setTimeout(() => {
-        if (currentSimulator === 'simple') {
-            simpleSim.state.chartsVisible = true;
-            simpleSim.drawAllCharts();
-        } else if (currentSimulator === 'damped') {
-            dampedSim.state.chartsVisible = true;
-            dampedSim.drawAllCharts();
-        } else {
-            forcedSim.state.chartsVisible = true;
-            forcedSim.drawAllCharts();
-        }
-    }, 200);
 }
 
 // 移除setupDesktopCharts函数，不再需要
