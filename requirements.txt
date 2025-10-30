@@ -1,0 +1,28 @@
+# 振动系统综合模拟器 - 依赖说明
+# Oscillation System Simulator - Requirements
+
+# 本项目是纯前端HTML/CSS/JavaScript应用
+# 无需Python或其他后端依赖
+# This is a pure frontend HTML/CSS/JavaScript application
+# No Python or backend dependencies required
+
+# 可选：用于本地开发服务器（Optional: For local development server）
+# 如使用Python服务器：python -m http.server 8000
+# 如使用Node.js服务器：npx http-server -p 8000
+
+# 运行环境要求 (Runtime Requirements):
+# - 现代Web浏览器 (Modern Web Browser)
+#   - Chrome 60+
+#   - Firefox 55+
+#   - Safari 12+
+#   - Edge 79+
+# - 支持HTML5 Canvas API
+# - 启用JavaScript
+
+# 开发环境要求 (Development Requirements):
+# - 文本编辑器 (VS Code, Sublime Text, etc.)
+# - Git (用于版本控制)
+# - 可选：Python 3.x 或 Node.js 14+ (用于本地服务器)
+
+# 注意：本文件仅用于说明，实际无需安装任何依赖
+# Note: This file is for documentation only, no actual dependencies need to be installed
